@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwipeDate</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --like-color: #4cd964;
+    --nope-color: #ff3b30;
+    --accent: #ff4458;
+    --bg: #f5f5f5;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: white;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .score-badge {
+    background: #fff0f1;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 5px 12px;
+    border-radius: 20px;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 420px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 0;
+  }
+
+  .card-stack {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    height: 520px;
+    user-select: none;
+  }
+
+  .card {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    overflow: hidden;
+    cursor: grab;
+    box-shadow: 0 8px 30px rgba(0,0,0,.15);
+    transition: transform 0.1s ease;
+    background: #ddd;
+  }
+
+  .card:nth-child(1) { z-index: 3; }
+  .card:nth-child(2) { z-index: 2; transform: scale(0.96) translateY(12px); }
+  .card:nth-child(3) { z-index: 1; transform: scale(0.92) translateY(24px); }
+
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    display: block;
+  }
+
+  .card-gradient {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 55%;
+    background: linear-gradient(to top, rgba(0,0,0,.85) 0%, transparent 100%);
+  }
+
+  .card-info {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 20px 22px;
+    color: white;
+  }
+
+  .card-name {
+    font-size: 26px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-age { font-size: 22px; font-weight: 400; opacity: .9; }
+  .card-distance { font-size: 13px; opacity: .8; margin-top: 3px; }
+
+  .card-bio {
+    font-size: 14px;
+    margin-top: 8px;
+    opacity: .9;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .tag {
+    background: rgba(255,255,255,.2);
+    backdrop-filter: blur(4px);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .stamp {
+    position: absolute;
+    top: 36px;
+    font-size: 36px;
+    font-weight: 900;
+    border: 5px solid;
+    border-radius: 8px;
+    padding: 6px 14px;
+    letter-spacing: 2px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    text-transform: uppercase;
+  }
+
+  .stamp-like {
+    left: 20px;
+    color: var(--like-color);
+    border-color: var(--like-color);
+    transform: rotate(-15deg);
+  }
+
+  .stamp-nope {
+    right: 20px;
+    color: var(--nope-color);
+    border-color: var(--nope-color);
+    transform: rotate(15deg);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 28px;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .1s, box-shadow .1s;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    background: white;
+  }
+
+  .btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+  .btn:active { transform: scale(0.95); }
+
+  .btn-nope  { width: 60px; height: 60px; color: var(--nope-color); }
+  .btn-like  { width: 60px; height: 60px; color: var(--like-color); }
+  .btn-super { width: 50px; height: 50px; color: #1e90ff; }
+
+  .btn svg { width: 28px; height: 28px; }
+  .btn-super svg { width: 22px; height: 22px; }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s;
+  }
+
+  .modal-overlay.show { opacity: 1; pointer-events: all; }
+
+  .match-modal {
+    background: white;
+    border-radius: 24px;
+    padding: 40px 30px;
+    text-align: center;
+    max-width: 320px;
+    width: 90%;
+    transform: scale(0.8);
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  .modal-overlay.show .match-modal { transform: scale(1); }
+
+  .match-icon {
+    font-size: 56px;
+    margin-bottom: 10px;
+    display: block;
+    animation: pulse .6s infinite alternate;
+  }
+
+  @keyframes pulse {
+    from { transform: scale(1); }
+    to   { transform: scale(1.15); }
+  }
+
+  .match-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .match-avatars {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+  }
+
+  .match-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 3px solid white;
+    object-fit: cover;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    margin: 0 -8px;
+  }
+
+  .match-sub { color: #888; font-size: 14px; margin-bottom: 24px; }
+
+  .btn-msg {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 12px;
+    transition: background .2s;
+  }
+
+  .btn-msg:hover { background: #e63048; }
+
+  .btn-dismiss {
+    background: none;
+    border: 2px solid #ddd;
+    border-radius: 30px;
+    padding: 12px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color .2s;
+  }
+
+  .btn-dismiss:hover { border-color: #bbb; }
+
+  .stats {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+    font-size: 13px;
+    color: #999;
+  }
+
+  .stat { display: flex; align-items: center; gap: 5px; }
+  .stat span { font-weight: 700; color: #333; }
+
+  .empty {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 520px;
+    color: #aaa;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .empty.show { display: flex; }
+  .empty-icon { font-size: 60px; }
+  .empty h2 { font-size: 20px; color: #555; }
+  .empty p { font-size: 14px; max-width: 240px; line-height: 1.5; }
+
+  .btn-reload {
+    margin-top: 10px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    padding: 12px 28px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .card-skeleton {
+    background: linear-gradient(90deg, #e8e8e8 25%, #f5f5f5 50%, #e8e8e8 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  @keyframes flyRight {
+    to { transform: translateX(130%) rotate(30deg); opacity: 0; }
+  }
+
+  @keyframes flyLeft {
+    to { transform: translateX(-130%) rotate(-30deg); opacity: 0; }
+  }
+
+  .fly-right { animation: flyRight .42s cubic-bezier(.55,.06,.68,.19) forwards; }
+  .fly-left  { animation: flyLeft  .42s cubic-bezier(.55,.06,.68,.19) forwards; }
+
+  @keyframes confetti-fall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(300px) rotate(540deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SwipeDate 💘</div>
+  <div class="score-badge" id="score-badge">❤️ 0 matches</div>
+</header>
+
+<div class="app">
+  <div class="card-stack" id="card-stack"></div>
+
+  <div class="empty" id="empty-state">
+    <div class="empty-icon">🌅</div>
+    <h2>You've seen everyone!</h2>
+    <p>Come back later or reload to start fresh.</p>
+    <button class="btn-reload" onclick="initCards()">Reload Profiles</button>
+  </div>
+
+  <div class="actions" id="actions">
+    <button class="btn btn-nope" title="Nope (←)" onclick="swipeCard('left')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <button class="btn btn-super" title="Super Like (↑)" onclick="superLike()">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+      </svg>
+    </button>
+    <button class="btn btn-like" title="Like (→)" onclick="swipeCard('right')">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="stats">
+    <div class="stat">👍 <span id="stat-likes">0</span> likes</div>
+    <div class="stat">👎 <span id="stat-nopes">0</span> nopes</div>
+    <div class="stat">⭐ <span id="stat-super">0</span> super</div>
+  </div>
+</div>
+
+<!-- Match Modal -->
+<div class="modal-overlay" id="match-modal">
+  <div class="match-modal">
+    <span class="match-icon">💘</span>
+    <div class="match-title">It's a Match!</div>
+    <div class="match-avatars">
+      <img class="match-avatar" src="https://randomuser.me/api/portraits/lego/1.jpg" id="my-avatar" alt="You">
+      <img class="match-avatar" src="" id="their-avatar" alt="Match">
+    </div>
+    <div class="match-sub">You and <strong id="match-name"></strong> liked each other!</div>
+    <button class="btn-msg">Send a Message 💬</button>
+    <button class="btn-dismiss" onclick="closeModal()">Keep Swiping</button>
+  </div>
+</div>
+
+<script>
+const PROFILES = [
+  { name: 'Sofia',    age: 26, distance: '2 mi away',  bio: 'Coffee addict ☕ | Dog mom 🐶 | Hiking on weekends. Looking for my adventure partner!', tags: ['Travel','Dogs','Yoga'],       gender: 'women', id: 1,  matchChance: 0.70 },
+  { name: 'James',    age: 29, distance: '5 mi away',  bio: 'Chef by day, guitarist by night 🎸 | Sushi enthusiast. Let\'s find a hidden gem together.', tags: ['Music','Food','Art'],        gender: 'men',   id: 12, matchChance: 0.60 },
+  { name: 'Mia',      age: 24, distance: '1 mi away',  bio: 'Bookworm turned traveler 📚✈️ | 23 countries & counting | Fluent in sarcasm.',           tags: ['Books','Travel','Humor'],    gender: 'women', id: 5,  matchChance: 0.75 },
+  { name: 'Ethan',    age: 31, distance: '8 mi away',  bio: 'Startup founder & weekend surfer 🏄 | Always building something. Come build a sandcastle?',tags: ['Surf','Tech','Fitness'],     gender: 'men',   id: 3,  matchChance: 0.50 },
+  { name: 'Lena',     age: 27, distance: '3 mi away',  bio: 'Painter | Gallery curator 🎨 | Believe every wall is a canvas. Seeking someone colorful.',  tags: ['Art','Wine','Museums'],      gender: 'women', id: 8,  matchChance: 0.65 },
+  { name: 'Marcus',   age: 33, distance: '12 mi away', bio: 'Former athlete, current dad-joke champion 🏆 | I\'ll cook, you wash dishes. Deal?',        tags: ['Sports','Cooking','Comedy'], gender: 'men',   id: 20, matchChance: 0.55 },
+  { name: 'Aisha',    age: 25, distance: '4 mi away',  bio: 'Med student who stress-bakes 🍰 | Plants, sunsets & occasional midnight snack runs.',       tags: ['Baking','Plants','Med'],     gender: 'women', id: 15, matchChance: 0.80 },
+  { name: 'Ryan',     age: 28, distance: '7 mi away',  bio: 'Rock climber & astronomy nerd 🌌 | Let\'s stargaze from a mountain top. No seriously.',     tags: ['Climbing','Stars','Outdoors'],gender: 'men',  id: 7,  matchChance: 0.60 },
+  { name: 'Zoe',      age: 23, distance: '6 mi away',  bio: 'Film director in the making 🎬 | Indie coffee shops, vinyl records & long walks by water.', tags: ['Film','Music','Coffee'],     gender: 'women', id: 22, matchChance: 0.70 },
+  { name: 'Noah',     age: 30, distance: '9 mi away',  bio: 'Marine biologist 🐠 | Can name every fish at the aquarium. Will teach you if you ask.',     tags: ['Ocean','Science','Nature'],  gender: 'men',   id: 45, matchChance: 0.65 },
+  { name: 'Isabelle', age: 28, distance: '2 mi away',  bio: 'French pastry chef 🥐 | Runs marathons to justify the butter. Lyon → NYC. Oui oui!',        tags: ['Baking','Running','France'], gender: 'women', id: 33, matchChance: 0.72 },
+  { name: 'Dev',      age: 27, distance: '4 mi away',  bio: 'Software engineer 💻 | Vegan foodie | Board game Saturdays. Swipe right to beat me at chess.',tags: ['Tech','Chess','Veganism'],  gender: 'men',   id: 55, matchChance: 0.58 },
+  { name: 'Priya',    age: 26, distance: '3 mi away',  bio: 'Bollywood dancer & data scientist 💃📊 | Finding patterns in everything — including you.',   tags: ['Dance','Data','Culture'],    gender: 'women', id: 44, matchChance: 0.68 },
+  { name: 'Lucas',    age: 32, distance: '6 mi away',  bio: 'Architect who builds Lego on weekends 🏗️ | Perfecting the art of the lazy Sunday.',        tags: ['Design','Lego','Coffee'],    gender: 'men',   id: 60, matchChance: 0.62 },
+  { name: 'Emma',     age: 29, distance: '5 mi away',  bio: 'Vet tech & rescue volunteer 🐾 | If you\'re scared of big dogs we might not work out 😅',   tags: ['Animals','Nature','Hiking'], gender: 'women', id: 50, matchChance: 0.78 },
+];
+
+let cards = [];
+let activeCard = null;
+let startX = 0, startY = 0, currentX = 0, currentY = 0;
+let dragging = false;
+let stats = { likes: 0, nopes: 0, super: 0, matches: 0 };
+
+function imgUrl(gender, id) {
+  return `https://randomuser.me/api/portraits/${gender}/${id}.jpg`;
+}
+
+function avatarFallback(card, name) {
+  card.classList.remove('card-skeleton');
+  const hue = (name.charCodeAt(0) * 37) % 360;
+  card.style.background = `linear-gradient(135deg, hsl(${hue},55%,55%), hsl(${(hue+40)%360},55%,38%))`;
+  const el = document.createElement('div');
+  el.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);font-size:100px;color:rgba(255,255,255,.5);font-weight:800;pointer-events:none;';
+  el.textContent = name[0];
+  card.appendChild(el);
+}
+
+function createCard(profile) {
+  const card = document.createElement('div');
+  card.className = 'card card-skeleton';
+
+  const img = document.createElement('img');
+  img.alt = profile.name;
+  img.onload = () => card.classList.remove('card-skeleton');
+  img.onerror = () => avatarFallback(card, profile.name);
+  img.src = imgUrl(profile.gender, profile.id);
+
+  const gradient = document.createElement('div');
+  gradient.className = 'card-gradient';
+
+  const info = document.createElement('div');
+  info.className = 'card-info';
+  info.innerHTML = `
+    <div class="card-name">${profile.name} <span class="card-age">${profile.age}</span></div>
+    <div class="card-distance">📍 ${profile.distance}</div>
+    <div class="card-bio">${profile.bio}</div>
+    <div class="card-tags">${profile.tags.map(t => `<span class="tag">#${t}</span>`).join('')}</div>
+  `;
+
+  const stampLike = document.createElement('div');
+  stampLike.className = 'stamp stamp-like';
+  stampLike.textContent = 'LIKE';
+
+  const stampNope = document.createElement('div');
+  stampNope.className = 'stamp stamp-nope';
+  stampNope.textContent = 'NOPE';
+
+  card.append(img, gradient, info, stampLike, stampNope);
+  card._profile = profile;
+  card._stampLike = stampLike;
+  card._stampNope = stampNope;
+
+  card.addEventListener('mousedown', dragStart);
+  card.addEventListener('touchstart', dragStart, { passive: true });
+
+  return card;
+}
+
+function initCards() {
+  const stack = document.getElementById('card-stack');
+  document.getElementById('empty-state').classList.remove('show');
+  document.getElementById('actions').style.display = '';
+  stack.innerHTML = '';
+  cards = [];
+  stats = { likes: 0, nopes: 0, super: 0, matches: 0 };
+  updateStats();
+
+  const shuffled = [...PROFILES].sort(() => Math.random() - 0.5);
+  shuffled.forEach(p => {
+    const card = createCard(p);
+    stack.appendChild(card);
+    cards.push(card);
+  });
+  // Reverse so first profile is visually on top (last child = top z-index via :nth-child)
+  cards.reverse();
+  cards.forEach(c => stack.prepend(c));
+
+  updateStackVisuals();
+}
+
+function updateStackVisuals() {
+  cards.slice(0, 3).forEach((c, i) => {
+    c.style.transition = 'transform .25s ease';
+    if (i === 0)      c.style.transform = '';
+    else if (i === 1) c.style.transform = 'scale(0.96) translateY(12px)';
+    else              c.style.transform = 'scale(0.92) translateY(24px)';
+  });
+}
+
+// ── Drag ──
+function dragStart(e) {
+  if (!cards.length) return;
+  activeCard = cards[0];
+  dragging = true;
+  const pt = e.touches ? e.touches[0] : e;
+  startX = pt.clientX; startY = pt.clientY;
+  currentX = 0; currentY = 0;
+  activeCard.style.transition = 'none';
+  activeCard.style.cursor = 'grabbing';
+  document.addEventListener('mousemove', dragMove);
+  document.addEventListener('mouseup', dragEnd);
+  document.addEventListener('touchmove', dragMove, { passive: true });
+  document.addEventListener('touchend', dragEnd);
+}
+
+function dragMove(e) {
+  if (!dragging || !activeCard) return;
+  const pt = e.touches ? e.touches[0] : e;
+  currentX = pt.clientX - startX;
+  currentY = pt.clientY - startY;
+  const rot = currentX * 0.08;
+  activeCard.style.transform = `translate(${currentX}px,${currentY * 0.4}px) rotate(${rot}deg)`;
+  const ratio = Math.min(Math.abs(currentX) / 100, 1);
+  activeCard._stampLike.style.opacity = currentX > 0 ? ratio : 0;
+  activeCard._stampNope.style.opacity = currentX < 0 ? ratio : 0;
+}
+
+function dragEnd() {
+  dragging = false;
+  document.removeEventListener('mousemove', dragMove);
+  document.removeEventListener('mouseup', dragEnd);
+  document.removeEventListener('touchmove', dragMove);
+  document.removeEventListener('touchend', dragEnd);
+  if (!activeCard) return;
+  activeCard.style.cursor = 'grab';
+  if (Math.abs(currentX) > 90) {
+    swipeCard(currentX > 0 ? 'right' : 'left', activeCard);
+  } else {
+    activeCard.style.transition = 'transform .4s cubic-bezier(.175,.885,.32,1.275)';
+    activeCard.style.transform = '';
+    activeCard._stampLike.style.opacity = 0;
+    activeCard._stampNope.style.opacity = 0;
+    activeCard = null;
+  }
+}
+
+// ── Swipe ──
+function swipeCard(dir, card) {
+  card = card || cards[0];
+  if (!card) return;
+  const profile = card._profile;
+
+  if (dir === 'right') { card._stampLike.style.opacity = 1; stats.likes++; }
+  else                 { card._stampNope.style.opacity = 1; stats.nopes++; }
+
+  card.classList.add(dir === 'right' ? 'fly-right' : 'fly-left');
+  card.addEventListener('animationend', () => {
+    card.remove();
+    cards.shift();
+    updateStackVisuals();
+    checkEmpty();
+    updateStats();
+    if (dir === 'right' && Math.random() < profile.matchChance) {
+      setTimeout(() => showMatch(profile), 350);
+    }
+  }, { once: true });
+  activeCard = null;
+}
+
+function superLike() {
+  const card = cards[0];
+  if (!card) return;
+  const profile = card._profile;
+  stats.super++;
+  card._stampLike.style.cssText += 'opacity:1;color:#1e90ff;border-color:#1e90ff;';
+  card._stampLike.textContent = 'SUPER';
+  card.classList.add('fly-right');
+  card.addEventListener('animationend', () => {
+    card.remove();
+    cards.shift();
+    updateStackVisuals();
+    checkEmpty();
+    updateStats();
+    setTimeout(() => showMatch(profile), 350);
+  }, { once: true });
+  activeCard = null;
+}
+
+// ── UI updates ──
+function updateStats() {
+  document.getElementById('stat-likes').textContent  = stats.likes;
+  document.getElementById('stat-nopes').textContent  = stats.nopes;
+  document.getElementById('stat-super').textContent  = stats.super;
+  document.getElementById('score-badge').textContent = `❤️ ${stats.matches} match${stats.matches !== 1 ? 'es' : ''}`;
+}
+
+function checkEmpty() {
+  if (!cards.length) {
+    document.getElementById('empty-state').classList.add('show');
+    document.getElementById('actions').style.display = 'none';
+  }
+}
+
+// ── Match modal ──
+function showMatch(profile) {
+  stats.matches++;
+  updateStats();
+  document.getElementById('their-avatar').src = imgUrl(profile.gender, profile.id);
+  document.getElementById('match-name').textContent = profile.name;
+  document.getElementById('match-modal').classList.add('show');
+  confettiBurst();
+}
+
+function closeModal() {
+  document.getElementById('match-modal').classList.remove('show');
+}
+
+// ── Confetti ──
+function confettiBurst() {
+  const colors = ['#ff4458','#ff9a00','#4cd964','#1e90ff','#e040fb','#ffcc00'];
+  for (let i = 0; i < 60; i++) {
+    const el = document.createElement('div');
+    const size = 6 + Math.random() * 8;
+    const dir  = Math.random() > 0.5 ? 1 : -1;
+    el.style.cssText = `
+      position:fixed;width:${size}px;height:${size}px;
+      border-radius:${Math.random()>.5?'50%':'3px'};
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      top:${20+Math.random()*40}%;left:${10+Math.random()*80}%;
+      pointer-events:none;z-index:200;
+      animation:confetti-fall ${0.8+Math.random()*.8}s ease-out ${Math.random()*0.3}s forwards;
+    `;
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+
+// ── Keyboard ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft')  swipeCard('left');
+  if (e.key === 'ArrowRight') swipeCard('right');
+  if (e.key === 'ArrowUp')    superLike();
+  if (e.key === 'Escape')     closeModal();
+});
+
+initCards();
+</script>
+</body>
+</html>

@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spark — Dating App</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .app {
+    width: 390px;
+    height: 844px;
+    background: #f5f5f5;
+    border-radius: 40px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+    position: relative;
+  }
+
+  /* Header */
+  .header {
+    background: white;
+    padding: 16px 24px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  }
+  .logo {
+    font-size: 26px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fd5068, #ff8c42);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+  }
+  .logo span { font-size: 22px; }
+  .header-btn {
+    width: 38px; height: 38px;
+    border: none; background: none; cursor: pointer;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .header-btn:hover { background: #f0f0f0; }
+  .header-btn svg { width: 22px; height: 22px; }
+
+  /* Card stack */
+  .card-area {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  .card-stack {
+    position: relative;
+    width: 340px;
+    height: 490px;
+  }
+
+  .card {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    cursor: grab;
+    transition: transform 0.1s;
+    user-select: none;
+    will-change: transform;
+  }
+  .card:active { cursor: grabbing; }
+
+  .card:nth-child(2) {
+    transform: scale(0.96) translateY(12px);
+    z-index: 1;
+  }
+  .card:nth-child(3) {
+    transform: scale(0.92) translateY(24px);
+    z-index: 0;
+  }
+  .card:nth-child(n+4) { display: none; }
+
+  .card.top { z-index: 10; }
+  .card.animating { transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+
+  .card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+    background: #ddd;
+  }
+
+  /* Gradient overlay */
+  .card-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent 30%, rgba(0,0,0,0.75) 100%);
+    padding: 24px 20px 20px;
+    color: white;
+  }
+
+  .profile-name {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .profile-age {
+    font-size: 22px;
+    font-weight: 400;
+    margin-left: 8px;
+    opacity: 0.9;
+  }
+  .profile-dist {
+    font-size: 13px;
+    opacity: 0.75;
+    margin-top: 2px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .profile-bio {
+    font-size: 14px;
+    opacity: 0.88;
+    margin-top: 8px;
+    line-height: 1.4;
+    max-height: 52px;
+    overflow: hidden;
+  }
+  .profile-tags {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 10px;
+  }
+  .tag {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.35);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+  }
+
+  /* Swipe indicators */
+  .swipe-label {
+    position: absolute;
+    top: 40px;
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    border: 4px solid;
+    transform: rotate(-15deg);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+    transition: opacity 0.1s;
+  }
+  .swipe-label.like {
+    left: 20px;
+    color: #4caf82;
+    border-color: #4caf82;
+    transform: rotate(-15deg);
+    text-shadow: 0 2px 8px rgba(76,175,130,0.4);
+  }
+  .swipe-label.nope {
+    right: 20px;
+    color: #fd5068;
+    border-color: #fd5068;
+    transform: rotate(15deg);
+    text-shadow: 0 2px 8px rgba(253,80,104,0.4);
+  }
+  .swipe-label.super {
+    top: auto;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) rotate(0deg);
+    color: #4fc3f7;
+    border-color: #4fc3f7;
+    text-shadow: 0 2px 8px rgba(79,195,247,0.4);
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: #888;
+    gap: 12px;
+  }
+  .empty-state svg { width: 80px; height: 80px; opacity: 0.3; }
+  .empty-state h3 { font-size: 20px; font-weight: 600; }
+  .empty-state p { font-size: 14px; }
+  .reload-btn {
+    margin-top: 16px;
+    padding: 12px 28px;
+    background: linear-gradient(135deg, #fd5068, #ff8c42);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 16px rgba(253,80,104,0.35);
+  }
+  .reload-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(253,80,104,0.45); }
+
+  /* Action buttons */
+  .actions {
+    padding: 12px 32px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: white;
+    border-top: 1px solid #f0f0f0;
+  }
+  .action-btn {
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+  }
+  .action-btn:hover { transform: scale(1.1); }
+  .action-btn:active { transform: scale(0.95); }
+
+  .btn-rewind {
+    width: 46px; height: 46px;
+    background: white;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  }
+  .btn-rewind svg { width: 22px; height: 22px; color: #f5a623; }
+
+  .btn-nope {
+    width: 64px; height: 64px;
+    background: white;
+    box-shadow: 0 4px 20px rgba(253,80,104,0.3);
+  }
+  .btn-nope svg { width: 32px; height: 32px; color: #fd5068; }
+
+  .btn-super {
+    width: 46px; height: 46px;
+    background: white;
+    box-shadow: 0 2px 12px rgba(79,195,247,0.25);
+  }
+  .btn-super svg { width: 22px; height: 22px; color: #4fc3f7; }
+
+  .btn-like {
+    width: 64px; height: 64px;
+    background: white;
+    box-shadow: 0 4px 20px rgba(76,175,130,0.3);
+  }
+  .btn-like svg { width: 32px; height: 32px; color: #4caf82; }
+
+  .btn-boost {
+    width: 46px; height: 46px;
+    background: linear-gradient(135deg, #9c27b0, #673ab7);
+    box-shadow: 0 2px 12px rgba(156,39,176,0.3);
+  }
+  .btn-boost svg { width: 22px; height: 22px; color: white; }
+
+  /* Match overlay */
+  .match-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, #fd5068ee, #ff8c42ee);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: matchIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .match-overlay.show { display: flex; }
+
+  @keyframes matchIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .match-title {
+    font-size: 42px;
+    font-weight: 800;
+    color: white;
+    letter-spacing: -1px;
+    text-align: center;
+    line-height: 1;
+  }
+  .match-sub {
+    color: rgba(255,255,255,0.85);
+    font-size: 16px;
+    margin-top: 8px;
+    text-align: center;
+  }
+  .match-photos {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 32px 0;
+  }
+  .match-photo {
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    border: 4px solid white;
+    object-fit: cover;
+    background: #ddd;
+  }
+  .match-photo:first-child { margin-right: -20px; z-index: 1; }
+  .match-heart {
+    width: 40px; height: 40px;
+    background: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    font-size: 20px;
+  }
+  .match-btn {
+    padding: 14px 40px;
+    border-radius: 30px;
+    border: none;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: transform 0.15s;
+  }
+  .match-btn:hover { transform: scale(1.05); }
+  .match-btn.primary {
+    background: white;
+    color: #fd5068;
+  }
+  .match-btn.secondary {
+    background: transparent;
+    border: 2px solid rgba(255,255,255,0.7);
+    color: white;
+    margin-top: 12px;
+  }
+
+  /* Nav bar */
+  .nav {
+    background: white;
+    padding: 10px 0 14px;
+    display: flex;
+    justify-content: space-around;
+    border-top: 1px solid #f0f0f0;
+  }
+  .nav-btn {
+    background: none; border: none;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 3px;
+    padding: 4px 12px;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+  }
+  .nav-btn.active { opacity: 1; }
+  .nav-btn svg { width: 24px; height: 24px; }
+  .nav-btn span { font-size: 10px; font-weight: 600; }
+  .nav-btn.active span { color: #fd5068; }
+  .nav-btn.active svg { color: #fd5068; }
+
+  /* Notification badge */
+  .badge {
+    position: absolute;
+    top: 2px; right: 10px;
+    width: 16px; height: 16px;
+    background: #fd5068;
+    border-radius: 50%;
+    font-size: 9px;
+    color: white;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 4px solid #eee;
+    border-top-color: #fd5068;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: #aaa;
+    font-size: 14px;
+    height: 100%;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <button class="header-btn" title="Filters">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="#bbb">
+        <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+      </svg>
+    </button>
+    <div class="logo"><span>✦</span> Spark</div>
+    <button class="header-btn" title="Chats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="#bbb">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Card Area -->
+  <div class="card-area" id="cardArea">
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <span>Finding people near you…</span>
+    </div>
+    <div class="card-stack" id="cardStack" style="display:none;"></div>
+    <div class="empty-state" id="emptyState">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/>
+      </svg>
+      <h3>You've seen everyone!</h3>
+      <p>Check back later for new people</p>
+      <button class="reload-btn" onclick="reloadProfiles()">Refresh Profiles</button>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="actions" id="actionBar">
+    <button class="action-btn btn-rewind" onclick="rewind()" title="Rewind">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+    </button>
+    <button class="action-btn btn-nope" onclick="swipeCard('left')" title="Nope">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+    <button class="action-btn btn-super" onclick="swipeCard('up')" title="Super Like">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.77 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.92 4.53 4.92.42-3.73 3.23L16.23 18z"/></svg>
+    </button>
+    <button class="action-btn btn-like" onclick="swipeCard('right')" title="Like">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </button>
+    <button class="action-btn btn-boost" title="Boost">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2.05v2.02c3.95.49 7 3.85 7 7.93 0 3.21-1.81 6-4.72 7.28L13 17v5h5l-1.22-1.22C19.91 19.07 22 15.76 22 12c0-5.18-3.95-9.45-9-9.95zM11 2.05C5.95 2.55 2 6.82 2 12c0 3.76 2.09 7.07 5.22 8.78L6 22h5v-5l-2.28 2.28C7.01 18.3 6 15.52 6 12.93c0-3.52 2.4-6.48 5-7.88V2.05z"/></svg>
+    </button>
+  </div>
+
+  <!-- Nav Bar -->
+  <div class="nav">
+    <button class="nav-btn" title="Discover">
+      <svg viewBox="0 0 24 24" fill="currentColor" color="#bbb"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      <span>Discover</span>
+    </button>
+    <button class="nav-btn active" title="Swipe">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      <span style="color:#fd5068;">Spark</span>
+    </button>
+    <button class="nav-btn" style="position:relative;" title="Matches">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="#bbb">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span class="badge" id="matchBadge">0</span>
+      <span>Matches</span>
+    </button>
+    <button class="nav-btn" title="Profile">
+      <svg viewBox="0 0 24 24" fill="currentColor" color="#bbb"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      <span>Profile</span>
+    </button>
+  </div>
+
+  <!-- Match Overlay -->
+  <div class="match-overlay" id="matchOverlay">
+    <div style="font-size:48px; margin-bottom:4px;">🎉</div>
+    <div class="match-title">It's a Match!</div>
+    <div class="match-sub">You and <span id="matchName">Alex</span> liked each other</div>
+    <div class="match-photos">
+      <img class="match-photo" src="https://i.pravatar.cc/150?img=1" id="myPhoto" alt="You">
+      <div class="match-heart">❤️</div>
+      <img class="match-photo" src="" id="matchPhoto" alt="Match" style="margin-left:-20px;">
+    </div>
+    <button class="match-btn primary" onclick="sendMessage()">Send a Message</button>
+    <button class="match-btn secondary" onclick="closeMatch()">Keep Swiping</button>
+  </div>
+</div>
+
+<script>
+// ── Profile data ──────────────────────────────────────────────────────────────
+const profiles = [
+  { name:"Sophia", age:26, dist:"3 mi", bio:"Architect by day, amateur chef by night 🍜 Looking for someone to share good food and adventures.", tags:["Foodie","Travel","Art"], img:"https://i.pravatar.cc/400?img=47" },
+  { name:"James",  age:29, dist:"5 mi", bio:"Software dev who loves hiking and bad puns. Will teach you to code if you teach me to cook.", tags:["Tech","Hiking","Music"], img:"https://i.pravatar.cc/400?img=11" },
+  { name:"Mia",    age:24, dist:"1 mi", bio:"Free spirit, yoga instructor, plant mom 🌿 Sun, laughter, and spontaneous road trips are my love language.", tags:["Yoga","Nature","Dogs"], img:"https://i.pravatar.cc/400?img=44" },
+  { name:"Carlos", age:31, dist:"7 mi", bio:"Chef & food blogger. Fluent in Spanish, Italian, and sarcasm. Making tacos from scratch every Sunday 🌮", tags:["Cooking","Culture","Sports"], img:"https://i.pravatar.cc/400?img=15" },
+  { name:"Emma",   age:27, dist:"2 mi", bio:"Graphic designer obsessed with vintage records and strong espresso ☕ Bookshelf = personality.", tags:["Design","Music","Books"], img:"https://i.pravatar.cc/400?img=45" },
+  { name:"Liam",   age:28, dist:"9 mi", bio:"High school history teacher & weekend rock climber. I will absolutely make you watch a documentary.", tags:["History","Climbing","Film"], img:"https://i.pravatar.cc/400?img=12" },
+  { name:"Ava",    age:25, dist:"4 mi", bio:"Marine biologist saving one reef at a time 🐠 Looking for someone who's as passionate about their thing as I am about mine.", tags:["Ocean","Science","Travel"], img:"https://i.pravatar.cc/400?img=48" },
+  { name:"Noah",   age:30, dist:"6 mi", bio:"Musician & coffee shop regular. Writing songs nobody asked for, smiling at dogs I pass on the street.", tags:["Music","Coffee","Comedy"], img:"https://i.pravatar.cc/400?img=13" },
+  { name:"Zoe",    age:23, dist:"2 mi", bio:"Art student & thrift shop addict 🎨 Looking for someone to wander through museums with and argue about abstract art.", tags:["Art","Fashion","Cycling"], img:"https://i.pravatar.cc/400?img=46" },
+  { name:"Ethan",  age:32, dist:"8 mi", bio:"ER doctor who unwinds by running marathons. Yes, the irony of 'doctor who runs' is not lost on me.", tags:["Running","Medicine","Cooking"], img:"https://i.pravatar.cc/400?img=14" },
+  { name:"Luna",   age:26, dist:"3 mi", bio:"Astrophysicist and amateur stargazer 🌙 Can name every constellation and quote every Hitchhiker's Guide line.", tags:["Space","Books","Cats"], img:"https://i.pravatar.cc/400?img=49" },
+  { name:"Kai",    age:27, dist:"5 mi", bio:"Surfer, part-time photographer, full-time optimist 🌊 Chasing good waves and better sunsets.", tags:["Surf","Photography","Travel"], img:"https://i.pravatar.cc/400?img=53" },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let queue = [...profiles];
+let history = [];
+let matchCount = 0;
+const myPhotoSrc = "https://i.pravatar.cc/150?img=1";
+const MATCH_PROBABILITY = 0.45; // ~45% chance of match on like
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const cardStack   = document.getElementById('cardStack');
+const emptyState  = document.getElementById('emptyState');
+const loadingState= document.getElementById('loadingState');
+const matchOverlay= document.getElementById('matchOverlay');
+const matchBadge  = document.getElementById('matchBadge');
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function init() {
+  loadingState.style.display = 'flex';
+  cardStack.style.display = 'none';
+  emptyState.style.display = 'none';
+  queue = shuffle([...profiles]);
+  setTimeout(() => {
+    loadingState.style.display = 'none';
+    renderStack();
+  }, 1200);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function renderStack() {
+  cardStack.innerHTML = '';
+  if (queue.length === 0) {
+    cardStack.style.display = 'none';
+    emptyState.style.display = 'flex';
+    return;
+  }
+  cardStack.style.display = 'block';
+  emptyState.style.display = 'none';
+
+  const shown = queue.slice(0, 3);
+  shown.reverse().forEach((profile, i) => {
+    const card = makeCard(profile);
+    cardStack.appendChild(card);
+  });
+  setupDrag(cardStack.lastElementChild, queue[0]);
+}
+
+function makeCard(profile) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <img class="card-img" src="${profile.img}" alt="${profile.name}" draggable="false">
+    <div class="card-overlay">
+      <div>
+        <span class="profile-name">${profile.name}</span>
+        <span class="profile-age">${profile.age}</span>
+      </div>
+      <div class="profile-dist">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        ${profile.dist} away
+      </div>
+      <div class="profile-bio">${profile.bio}</div>
+      <div class="profile-tags">${profile.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    </div>
+    <div class="swipe-label like">LIKE</div>
+    <div class="swipe-label nope">NOPE</div>
+    <div class="swipe-label super">SUPER</div>
+  `;
+  return card;
+}
+
+// ── Drag & Swipe ──────────────────────────────────────────────────────────────
+function setupDrag(card, profile) {
+  if (!card) return;
+  card.classList.add('top');
+
+  let startX, startY, currX = 0, currY = 0, isDragging = false;
+  const likeLabel  = card.querySelector('.swipe-label.like');
+  const nopeLabel  = card.querySelector('.swipe-label.nope');
+  const superLabel = card.querySelector('.swipe-label.super');
+
+  function onStart(e) {
+    isDragging = true;
+    const pt = e.touches ? e.touches[0] : e;
+    startX = pt.clientX;
+    startY = pt.clientY;
+    card.style.transition = 'none';
+  }
+
+  function onMove(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e;
+    currX = pt.clientX - startX;
+    currY = pt.clientY - startY;
+
+    const rot = currX * 0.08;
+    card.style.transform = `translate(${currX}px, ${currY}px) rotate(${rot}deg)`;
+
+    const ratio = Math.abs(currX) / 120;
+    if (currX > 20) {
+      likeLabel.style.opacity = Math.min(ratio, 1);
+      nopeLabel.style.opacity = 0;
+      superLabel.style.opacity = 0;
+    } else if (currX < -20) {
+      nopeLabel.style.opacity = Math.min(ratio, 1);
+      likeLabel.style.opacity = 0;
+      superLabel.style.opacity = 0;
+    } else if (currY < -30) {
+      superLabel.style.opacity = Math.min(Math.abs(currY) / 80, 1);
+      likeLabel.style.opacity = 0;
+      nopeLabel.style.opacity = 0;
+    } else {
+      likeLabel.style.opacity = 0;
+      nopeLabel.style.opacity = 0;
+      superLabel.style.opacity = 0;
+    }
+  }
+
+  function onEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    likeLabel.style.opacity = 0;
+    nopeLabel.style.opacity = 0;
+    superLabel.style.opacity = 0;
+
+    if (currX > 80) {
+      animateOut(card, 'right', profile);
+    } else if (currX < -80) {
+      animateOut(card, 'left', profile);
+    } else if (currY < -80) {
+      animateOut(card, 'up', profile);
+    } else {
+      card.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      card.style.transform = '';
+    }
+    currX = 0; currY = 0;
+  }
+
+  card.addEventListener('mousedown',  onStart);
+  card.addEventListener('touchstart', onStart, { passive: true });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('mouseup', onEnd);
+  document.addEventListener('touchend', onEnd);
+
+  card._cleanup = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+    document.removeEventListener('touchend', onEnd);
+  };
+}
+
+function animateOut(card, direction, profile) {
+  card._cleanup && card._cleanup();
+  card.classList.add('animating');
+
+  let tx, ty, rot;
+  if (direction === 'right') { tx = 1200; ty = 80;  rot = 30; }
+  else if (direction === 'left')  { tx = -1200; ty = 80;  rot = -30; }
+  else                            { tx = 0;    ty = -1200; rot = 0; }
+
+  card.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.5s';
+  card.style.transform  = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+  card.style.opacity    = '0';
+
+  history.push({ profile, direction });
+  queue.shift();
+
+  setTimeout(() => {
+    card.remove();
+    if (direction === 'right' || direction === 'up') {
+      handleLike(profile, direction === 'up');
+    }
+    renderStack();
+  }, 500);
+}
+
+// ── Programmatic swipe ────────────────────────────────────────────────────────
+function swipeCard(direction) {
+  const top = cardStack.querySelector('.card.top');
+  if (!top || queue.length === 0) return;
+  animateOut(top, direction, queue[0]);
+}
+
+function rewind() {
+  if (history.length === 0) return;
+  const last = history.pop();
+  queue.unshift(last.profile);
+  renderStack();
+}
+
+function reloadProfiles() {
+  matchCount = 0;
+  matchBadge.textContent = 0;
+  init();
+}
+
+// ── Match logic ───────────────────────────────────────────────────────────────
+function handleLike(profile, isSuper) {
+  const matched = isSuper || Math.random() < MATCH_PROBABILITY;
+  if (!matched) return;
+
+  matchCount++;
+  matchBadge.textContent = matchCount;
+
+  document.getElementById('matchName').textContent  = profile.name;
+  document.getElementById('matchPhoto').src         = profile.img;
+  document.getElementById('myPhoto').src            = myPhotoSrc;
+  matchOverlay.classList.add('show');
+}
+
+function closeMatch() {
+  matchOverlay.classList.remove('show');
+}
+
+function sendMessage() {
+  matchOverlay.classList.remove('show');
+  showToast(`💬 Chat with ${document.getElementById('matchName').textContent} opened!`);
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = `
+    position:absolute; bottom:110px; left:50%; transform:translateX(-50%);
+    background:#333; color:white; padding:10px 20px; border-radius:20px;
+    font-size:13px; z-index:200; white-space:nowrap;
+    animation: fadeIn 0.3s ease;
+  `;
+  t.textContent = msg;
+  document.querySelector('.app').appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (matchOverlay.classList.contains('show')) {
+    if (e.key === 'Escape' || e.key === 'Enter') closeMatch();
+    return;
+  }
+  if (e.key === 'ArrowLeft'  || e.key === 'a') swipeCard('left');
+  if (e.key === 'ArrowRight' || e.key === 'd') swipeCard('right');
+  if (e.key === 'ArrowUp'    || e.key === 'w') swipeCard('up');
+  if (e.key === 'ArrowDown'  || e.key === 's') rewind();
+});
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

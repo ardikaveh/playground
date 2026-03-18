@@ -629,11 +629,11 @@ function shortenName(name) {
 // ═══════════════════════════════════════════════════════════════════
 //  3. D3 SETUP — layout, pack, dimensions
 // ═══════════════════════════════════════════════════════════════════
-var W = window.innerWidth;
-var H = window.innerHeight;
+let W = window.innerWidth;
+let H = window.innerHeight;
 
-var svg = d3.select("#viz").attr("width", W).attr("height", H);
-var defs = svg.append("defs");
+const svg = d3.select("#viz").attr("width", W).attr("height", H);
+const defs = svg.append("defs");
 var gMain = svg.append("g");
 var hierarchy, catNodes;
 

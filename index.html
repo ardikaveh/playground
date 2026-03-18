@@ -311,7 +311,7 @@
 // ═══════════════════════════════════════════════════════════════════
 //  1. DATA — CATS array with all 11 categories
 // ═══════════════════════════════════════════════════════════════════
-var CATS = [
+const CATS = [
   {
     id: "llm", name: "Language Models", emoji: "\u{1F9E0}",
     color: "#818cf8", glow: "#4f46e5",
@@ -927,7 +927,7 @@ function openPanel(tech, catId) {
 
   // tags
   var tagsEl = document.getElementById("panel-tags");
-  tagsEl.textContent = "";
+  while (tagsEl.firstChild) tagsEl.removeChild(tagsEl.firstChild);
   tech.tags.forEach(function(tag) {
     var s = document.createElement("span");
     s.className = "p-tag";
@@ -944,7 +944,7 @@ function openPanel(tech, catId) {
 
   // related techs (up to 3 siblings from same category)
   var relatedContainer = document.getElementById("panel-related-chips");
-  relatedContainer.textContent = "";
+  while (relatedContainer.firstChild) relatedContainer.removeChild(relatedContainer.firstChild);
   var siblings = cat.techs.filter(function(t) { return t.name !== tech.name; }).slice(0, 3);
   if (siblings.length > 0) {
     document.getElementById("panel-related").style.display = "block";

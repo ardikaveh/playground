@@ -486,11 +486,15 @@ let zoomed = null; // null = overview, else catId
 function zoomIn(catId) {
   if (zoomed === catId) return;
   zoomed = catId;
-  resetPan();
   updateNav(catId);
 
   runAnim(680, () => {
     const tweens = [];
+    // Animate viewport to identity (scale=1, pan=0) so bubbles fill the screen
+    const _fpx=panX, _fpy=panY, _fs=scale;
+    tweens.push({from:0,to:1,set:t=>{
+      panX=lerp(_fpx,0,t); panY=lerp(_fpy,0,t); scale=lerp(_fs,1,t); applyTransform();
+    }});
     CATS.forEach(cat=>{
       const isSel = cat.id === catId;
 
@@ -533,11 +537,16 @@ function zoomIn(catId) {
 
 function zoomOut() {
   zoomed = null;
-  resetPan();
   updateNav(null);
 
   runAnim(680, () => {
     const tweens = [];
+    // Animate viewport back to overview fit
+    const _fpx=panX, _fpy=panY, _fs=scale;
+    tweens.push({from:0,to:1,set:t=>{
+      panX=lerp(_fpx,initialPanX,t); panY=lerp(_fpy,initialPanY,t);
+      scale=lerp(_fs,initialScale,t); applyTransform();
+    }});
     CATS.forEach(cat=>{
       const fromFill  = parseFloat(cat._fill.getAttribute('opacity'));
       const fromRing  = parseFloat(cat._ring.getAttribute('opacity'));
@@ -568,53 +577,117 @@ function zoomOut() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PAN + TAP HANDLING
+// PAN + PINCH-ZOOM + TAP
 // ═══════════════════════════════════════════════════════════════
-let panX = 0, panY = 0;
-let _startX = 0, _startY = 0, _lastX = 0, _lastY = 0, _didPan = false;
-const PAN_THRESH = 6; // px of movement before treating as pan
+let panX = 0, panY = 0, scale = 1;
+let initialScale = 1, initialPanX = 0, initialPanY = 0;
 
-function applyPan() {
-  gWrapper.setAttribute('transform', `translate(${panX},${panY})`);
+// Compute fit-to-screen overview transform from category bounding box
+(function(){
+  let mnX = Infinity, mnY = Infinity, mxX = -Infinity, mxY = -Infinity;
+  CATS.forEach(cat=>{
+    mnX = Math.min(mnX, cat.ocx - cat.or);
+    mxX = Math.max(mxX, cat.ocx + cat.or);
+    mnY = Math.min(mnY, cat.ocy - cat.or);
+    mxY = Math.max(mxY, cat.ocy + cat.or);
+  });
+  const PAD = 36;
+  const ccx = (mnX + mxX) / 2, ccy = (mnY + mxY) / 2;
+  initialScale = Math.min((W - PAD*2) / (mxX - mnX), (H - PAD*2) / (mxY - mnY));
+  initialPanX  = W/2 - ccx * initialScale;
+  initialPanY  = H/2 - ccy * initialScale;
+  panX = initialPanX; panY = initialPanY; scale = initialScale;
+})();
+
+const MIN_SCALE = 0.25, MAX_SCALE = 6;
+const PAN_THRESH = 6;
+
+function applyTransform() {
+  gWrapper.setAttribute('transform', `translate(${panX},${panY}) scale(${scale})`);
 }
-function resetPan() {
-  panX = 0; panY = 0; applyPan();
-}
+applyTransform();
+
+// ── Pointer state ────────────────────────────────────────────
+const _ptrs = new Map();           // pointerId → {x, y}
+let _didPan = false;
+let _pinchActive = false, _snapPending = false;
+let _startX = 0, _startY = 0, _lastX = 0, _lastY = 0;
+let _prevDist = 1, _prevMidX = 0, _prevMidY = 0;
 
 svg.addEventListener('pointerdown', e=>{
-  _startX = _lastX = e.clientX;
-  _startY = _lastY = e.clientY;
-  _didPan = false;
   svg.setPointerCapture(e.pointerId);
+  _ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (_ptrs.size === 1) {
+    _startX = _lastX = e.clientX;
+    _startY = _lastY = e.clientY;
+    _didPan = false; _pinchActive = false;
+  } else if (_ptrs.size === 2) {
+    const [p0, p1] = [..._ptrs.values()];
+    _prevDist = Math.hypot(p1.x-p0.x, p1.y-p0.y);
+    _prevMidX = (p0.x+p1.x)/2; _prevMidY = (p0.y+p1.y)/2;
+    _pinchActive = true;
+    _didPan = true; // second finger cancels any pending tap
+  }
 }, {passive: true});
 
 svg.addEventListener('pointermove', e=>{
-  if (!(e.buttons & 1)) return;
-  const dx = e.clientX - _lastX, dy = e.clientY - _lastY;
-  _lastX = e.clientX; _lastY = e.clientY;
-  if (!_didPan && Math.hypot(e.clientX - _startX, e.clientY - _startY) > PAN_THRESH)
-    _didPan = true;
-  if (_didPan) { panX += dx; panY += dy; applyPan(); }
+  if (!_ptrs.has(e.pointerId)) return;
+  _ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+
+  if (_pinchActive && _ptrs.size >= 2) {
+    const [p0, p1] = [..._ptrs.values()];
+    const curDist = Math.hypot(p1.x-p0.x, p1.y-p0.y);
+    const curMidX = (p0.x+p1.x)/2, curMidY = (p0.y+p1.y)/2;
+    const ds = curDist / _prevDist;
+    const newScale = clamp(scale * ds, MIN_SCALE, MAX_SCALE);
+    const aDs = newScale / scale;
+    panX = curMidX + (panX - _prevMidX) * aDs;
+    panY = curMidY + (panY - _prevMidY) * aDs;
+    scale = newScale; applyTransform();
+    if (zoomed && !_snapPending && scale < 0.72) { _snapPending = true; zoomOut(); }
+    _prevDist = curDist; _prevMidX = curMidX; _prevMidY = curMidY;
+  } else if (!_pinchActive && _ptrs.size === 1) {
+    if (!(e.buttons & 1)) return;
+    const dx = e.clientX - _lastX, dy = e.clientY - _lastY;
+    _lastX = e.clientX; _lastY = e.clientY;
+    if (!_didPan && Math.hypot(e.clientX-_startX, e.clientY-_startY) > PAN_THRESH)
+      _didPan = true;
+    if (_didPan) { panX += dx; panY += dy; applyTransform(); }
+  }
 });
 
-svg.addEventListener('pointerup', e=>{
-  if (_didPan) { _didPan = false; return; }
-  // ── it's a tap ──
-  const t = e.target;
+function _handleTap(target) {
   if (panelOpen()) { closePanel(); return; }
-
-  const catId = t.getAttribute('data-cat');
-  const idx   = t.getAttribute('data-idx');
-
+  const catId = target.getAttribute('data-cat');
+  const idx   = target.getAttribute('data-idx');
   if (catId && idx !== null && idx !== undefined) {
-    const cat  = CATS.find(c=>c.id===catId);
-    const tech = cat.techs[+idx];
-    openPanel(tech, cat);
+    const cat = CATS.find(c=>c.id===catId);
+    openPanel(cat.techs[+idx], cat);
   } else if (catId) {
     zoomIn(catId);
-  } else {
-    if (zoomed) zoomOut();
+  } else if (zoomed) {
+    zoomOut();
   }
+}
+
+svg.addEventListener('pointerup', e=>{
+  _ptrs.delete(e.pointerId);
+  if (_ptrs.size < 2 && _pinchActive) {
+    _pinchActive = false; _snapPending = false;
+    if (_ptrs.size === 1) {
+      const [p] = [..._ptrs.values()];
+      _lastX = p.x; _lastY = p.y; _didPan = true;
+    }
+  }
+  if (_ptrs.size === 0) {
+    if (!_didPan) _handleTap(e.target);
+    _didPan = false;
+  }
+});
+
+svg.addEventListener('pointercancel', e=>{
+  _ptrs.delete(e.pointerId);
+  if (_ptrs.size < 2) _pinchActive = false;
 });
 
 document.getElementById('back').addEventListener('click', e=>{

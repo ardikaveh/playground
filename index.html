@@ -598,6 +598,10 @@ const CATS = [
 // ═══════════════════════════════════════════════════════════════════
 //  2. UTILITIES
 // ═══════════════════════════════════════════════════════════════════
+function isRightClick(event) {
+  return event.button > 0;
+}
+
 function shortenName(name) {
   var abbr = {
     "GitHub Copilot": "Copilot",
@@ -819,7 +823,7 @@ function drawAll() {
 // ═══════════════════════════════════════════════════════════════════
 var currentFocus = null;
 var zoomed = false;
-var currentView;
+var currentView = null;
 
 function resetView(animate) {
   currentView = [hierarchy.x, hierarchy.y, Math.max(W, H) * 1.3];
@@ -854,7 +858,7 @@ function zoomOut() {
 // ── Category hit zone events ─────────────────────────────────────
 function bindCatHitEvents(catHitGroup) {
   catHitGroup.selectAll("circle").on("pointerup", function(event) {
-    if (event.button && event.button !== 0) return;
+    if (isRightClick(event)) return;
     event.stopPropagation();
     if (isPanelOpen()) { closePanel(); return; }
     var catId = this.getAttribute("data-catid");
@@ -870,7 +874,7 @@ function bindCatHitEvents(catHitGroup) {
 // ── Tech bubble events ───────────────────────────────────────────
 function bindTechEvents(techGroup) {
   techGroup.selectAll(".tech-node").on("pointerup", function(event) {
-    if (event.button && event.button !== 0) return;
+    if (isRightClick(event)) return;
     event.stopPropagation();
     var name = this.getAttribute("data-id");
     var d = hierarchy.descendants().find(function(n) { return n.depth === 2 && n.data.name === name; });
@@ -881,7 +885,7 @@ function bindTechEvents(techGroup) {
 
 // Background tap — close panel or zoom out
 svg.on("pointerup", function(event) {
-  if (event.button && event.button !== 0) return;
+  if (isRightClick(event)) return;
   if (isPanelOpen()) { closePanel(); return; }
   if (zoomed) zoomOut();
 });
@@ -927,7 +931,7 @@ function openPanel(tech, catId) {
 
   // tags
   var tagsEl = document.getElementById("panel-tags");
-  while (tagsEl.firstChild) tagsEl.removeChild(tagsEl.firstChild);
+  tagsEl.replaceChildren();
   tech.tags.forEach(function(tag) {
     var s = document.createElement("span");
     s.className = "p-tag";
@@ -944,7 +948,7 @@ function openPanel(tech, catId) {
 
   // related techs (up to 3 siblings from same category)
   var relatedContainer = document.getElementById("panel-related-chips");
-  while (relatedContainer.firstChild) relatedContainer.removeChild(relatedContainer.firstChild);
+  relatedContainer.replaceChildren();
   var siblings = cat.techs.filter(function(t) { return t.name !== tech.name; }).slice(0, 3);
   if (siblings.length > 0) {
     document.getElementById("panel-related").style.display = "block";
@@ -954,7 +958,7 @@ function openPanel(tech, catId) {
       chip.textContent = sib.name;
       chip.style.borderColor = cat.color + "44";
       chip.addEventListener("pointerup", function(e) {
-        if (e.button && e.button !== 0) return;
+        if (isRightClick(e)) return;
         e.stopPropagation();
         openPanel(sib, catId);
       });
@@ -985,6 +989,12 @@ document.getElementById("panel-handle").addEventListener("click", function(e) {
 
 // swipe down to close panel with velocity detection and scroll awareness
 (function() {
+  var SCROLL_TOP_THRESHOLD = 5;
+  var MIN_SWIPE_DISTANCE = 40;
+  var LONG_SWIPE_DISTANCE = 80;
+  var FAST_SWIPE_TIME_MS = 300;
+  var FAST_SWIPE_MIN_DISTANCE = 30;
+
   var panelEl = document.getElementById("panel");
   var touchStartY = 0;
   var touchStartTime = 0;
@@ -999,7 +1009,8 @@ document.getElementById("panel-handle").addEventListener("click", function(e) {
     var dt = Date.now() - touchStartTime;
     var scrollTop = panelEl.scrollTop;
     // only close if panel is scrolled to top and swipe down is sufficient
-    if (scrollTop <= 5 && dy > 40 && (dy > 80 || (dt < 300 && dy > 30))) {
+    if (scrollTop <= SCROLL_TOP_THRESHOLD && dy > MIN_SWIPE_DISTANCE &&
+        (dy > LONG_SWIPE_DISTANCE || (dt < FAST_SWIPE_TIME_MS && dy > FAST_SWIPE_MIN_DISTANCE))) {
       closePanel();
     }
   }, { passive: true });

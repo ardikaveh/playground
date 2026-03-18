@@ -175,7 +175,7 @@ const CATS = [
   {
     id:"llm", name:"Language Models", emoji:"🧠",
     color:"#818cf8", glow:"#4f46e5",
-    weight:1.5, tier:"core", momentum:"explosive", maturity:"established",
+    weight:1.50, tier:"core", momentum:"explosive", maturity:"established", angularIndex:0,
     techs:[
       {name:"GPT-4o",       company:"OpenAI",      score:95, open:false, year:2024, tags:["multimodal","commercial"],
        desc:"OpenAI's flagship model with native voice, vision & text powering ChatGPT."},
@@ -200,7 +200,7 @@ const CATS = [
   {
     id:"reasoning", name:"Reasoning Models", emoji:"⚡",
     color:"#c084fc", glow:"#7c3aed",
-    weight:1.25, tier:"major", momentum:"explosive", maturity:"growing",
+    weight:1.35, tier:"core", momentum:"explosive", maturity:"growing", angularIndex:2,
     techs:[
       {name:"o3",               company:"OpenAI",   score:97, open:false, year:2025, tags:["chain-of-thought","SOTA"],
        desc:"OpenAI's most powerful model — near-human scores on PhD-level science benchmarks."},
@@ -217,7 +217,7 @@ const CATS = [
   {
     id:"image", name:"Image Generation", emoji:"🎨",
     color:"#f472b6", glow:"#db2777",
-    weight:1.0, tier:"major", momentum:"steady", maturity:"established",
+    weight:1.10, tier:"major", momentum:"steady", maturity:"established", angularIndex:5,
     techs:[
       {name:"Midjourney v6",   company:"Midjourney",       score:93, open:false, year:2024, tags:["artistic","photorealistic"],
        desc:"The gold standard for AI art — unmatched aesthetic quality used by designers worldwide."},
@@ -238,7 +238,7 @@ const CATS = [
   {
     id:"video", name:"Video Generation", emoji:"🎬",
     color:"#fb923c", glow:"#ea580c",
-    weight:0.9, tier:"emerging", momentum:"explosive", maturity:"growing",
+    weight:1.15, tier:"major", momentum:"explosive", maturity:"growing", angularIndex:4,
     techs:[
       {name:"Sora",         company:"OpenAI",   score:92, open:false, year:2024, tags:["text-to-video","world-model"],
        desc:"OpenAI's world-simulation model generating up to 60-second cinematic videos."},
@@ -257,7 +257,7 @@ const CATS = [
   {
     id:"audio", name:"Audio & Music", emoji:"🎵",
     color:"#34d399", glow:"#059669",
-    weight:0.8, tier:"emerging", momentum:"building", maturity:"growing",
+    weight:0.90, tier:"major", momentum:"steady", maturity:"growing", angularIndex:6,
     techs:[
       {name:"ElevenLabs", company:"ElevenLabs",    score:93, open:false, year:2023, tags:["voice-clone","TTS"],
        desc:"Industry-leading voice synthesis with ultra-realistic cloning from seconds of audio."},
@@ -276,7 +276,7 @@ const CATS = [
   {
     id:"code", name:"Code & Dev Tools", emoji:"💻",
     color:"#38bdf8", glow:"#0284c7",
-    weight:1.2, tier:"major", momentum:"steady", maturity:"established",
+    weight:1.40, tier:"core", momentum:"explosive", maturity:"established", angularIndex:1,
     techs:[
       {name:"GitHub Copilot",company:"Microsoft", score:91, open:false, year:2022, tags:["IDE","widespread"],
        desc:"The most widely-deployed AI coding assistant, used by 1M+ developers in VS Code."},
@@ -297,7 +297,7 @@ const CATS = [
   {
     id:"agents", name:"AI Agents", emoji:"🤖",
     color:"#facc15", glow:"#b45309",
-    weight:1.4, tier:"core", momentum:"explosive", maturity:"growing",
+    weight:1.20, tier:"major", momentum:"explosive", maturity:"growing", angularIndex:3,
     techs:[
       {name:"Operator",       company:"OpenAI",              score:87, open:false, year:2025, tags:["web-browser","autonomous"],
        desc:"OpenAI's AI agent that browses the web and completes real tasks like booking trips."},
@@ -316,7 +316,7 @@ const CATS = [
   {
     id:"robotics", name:"Robotics & Embodied", emoji:"🦾",
     color:"#e879f9", glow:"#a21caf",
-    weight:0.75, tier:"emerging", momentum:"building", maturity:"early",
+    weight:0.80, tier:"emerging", momentum:"building", maturity:"early", angularIndex:7,
     techs:[
       {name:"Atlas",        company:"Boston Dynamics",      score:89, open:false, year:2024, tags:["humanoid","dynamic"],
        desc:"World's most dynamic humanoid robot — does parkour, backflips, and complex tool use."},
@@ -369,19 +369,23 @@ const AH = H - HDR - LEG;      // usable height
 const CX = W/2, CY = HDR + AH/2; // visual center
 
 // Category orbital layout
-// Expand orbit by 15% to give room for size-varied bubbles
-const orbitR = Math.min(AH/2, W/2) * 0.60 * 1.15;
-const catBR  = orbitR * 0.34 * 0.90; // baseline radius (shrink slightly to compensate)
+const orbitR = Math.min(AH/2, W/2) * 0.60;
+const catBR  = orbitR * 0.34; // baseline bubble radius
 
-// Sort cats by weight descending so most important get prime angular positions
-const _sorted = [...CATS].sort((a,b)=>b.weight-a.weight);
-_sorted.forEach((cat,i)=>{ cat._angIdx = i; });
+// Tier-based orbit distance (core closer to center, emerging further out)
+const ORBIT_SCALE = { core: 0.92, major: 1.00, emerging: 1.08 };
 
-CATS.forEach((cat,i) => {
-  const ang = (cat._angIdx/CATS.length)*2*Math.PI - Math.PI/2;
-  cat.ocx = CX + orbitR*Math.cos(ang);
-  cat.ocy = CY + orbitR*Math.sin(ang);
-  cat.or  = catBR * cat.weight; // SIZE varies by importance weight
+// Compress weight range [0.80–1.50] → size range [0.82–1.22] to prevent bubble overlap
+function weightToSize(w) {
+  return 0.82 + (w - 0.80) / (1.50 - 0.80) * (1.22 - 0.82);
+}
+
+CATS.forEach((cat) => {
+  const ang   = (cat.angularIndex / CATS.length) * 2 * Math.PI - Math.PI / 2;
+  const tierR = orbitR * ORBIT_SCALE[cat.tier];
+  cat.ocx = CX + tierR * Math.cos(ang);
+  cat.ocy = CY + tierR * Math.sin(ang);
+  cat.or  = catBR * weightToSize(cat.weight); // SIZE varies by compressed weight
 
   // Tech dot positions in OVERVIEW (inside category bubble, scaled to bubble size)
   const pts = phyllotaxis(cat.techs.length, cat.or*0.62);
@@ -403,13 +407,13 @@ CATS.forEach((cat,i) => {
 });
 
 // Peripheral minimap positions — where non-selected cats live at L1
-const periR      = Math.min(W, H) * 0.42;
-const PERI_R_base = Math.max(18, catBR * 0.28); // baseline radius of peripheral bubbles
+const periR   = Math.min(W, H) * 0.42;
+const PERI_R  = Math.max(18, catBR * 0.28); // baseline radius of peripheral bubbles
 CATS.forEach((cat) => {
-  const ang = (cat._angIdx/CATS.length)*2*Math.PI - Math.PI/2; // preserve orbital order
+  const ang = (cat.angularIndex / CATS.length) * 2 * Math.PI - Math.PI / 2; // preserve angular order
   cat.pcx = CX + periR * Math.cos(ang);
   cat.pcy = CY + periR * Math.sin(ang);
-  cat.pr  = PERI_R_base * Math.max(0.7, cat.weight * 0.65); // size reflects importance
+  cat.pr  = PERI_R * Math.max(0.70, weightToSize(cat.weight) * 0.80); // size reflects importance
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -423,7 +427,9 @@ svg.setAttribute('height', H);
 const defs = el('defs',{},svg);
 CATS.forEach(cat=>{
   const f = el('filter',{id:`g-${cat.id}`,x:'-60%',y:'-60%',width:'220%',height:'220%'},defs);
-  el('feGaussianBlur',{stdDeviation:'4',result:'b'},f);
+  // Glow intensity scales with weight — core categories glow more
+  const sd = (4 + (cat.weight - 0.80) * 3).toFixed(1);
+  el('feGaussianBlur',{stdDeviation:sd,result:'b'},f);
   const m = el('feMerge',{},f);
   el('feMergeNode',{in:'b'},m); el('feMergeNode',{in:'SourceGraphic'},m);
 });
@@ -464,17 +470,27 @@ CATS.forEach(cat=>{
   }, gCats);
   cat._fill.style.cursor='pointer';
 
+  // Core categories get a subtle dashed outer ring to signal elevated status
+  if (cat.tier === 'core') {
+    cat._coreRing = el('circle',{
+      cx:cat.ocx, cy:cat.ocy, r:cat.or+10,
+      fill:'none', stroke:cat.color,
+      'stroke-width':'0.8', opacity:'0.14',
+      'stroke-dasharray':'3 5'
+    }, gCats);
+  }
+
   cat._emoji = el('text',{
-    x:cat.ocx, y:cat.ocy - catBR*0.14,
+    x:cat.ocx, y:cat.ocy - cat.or*0.14,
     'text-anchor':'middle','dominant-baseline':'central',
-    'font-size':catBR*0.42, fill:'white', opacity:'0.9'
+    'font-size':cat.or*0.42, fill:'white', opacity:'0.9'
   }, gLabels);
   cat._emoji.textContent = cat.emoji;
 
   cat._name = el('text',{
-    x:cat.ocx, y:cat.ocy + catBR*0.33,
+    x:cat.ocx, y:cat.ocy + cat.or*0.33,
     'text-anchor':'middle','dominant-baseline':'central',
-    'font-size':Math.min(catBR*0.2,12), fill:'white', opacity:'0.65',
+    'font-size':Math.min(cat.or*0.2,12), fill:'white', opacity:'0.65',
     'font-weight':'600'
   }, gLabels);
   cat._name.textContent = cat.name;
@@ -644,11 +660,11 @@ function zoomOut() {
         {from:fromCr, to:cat.or,  set:v=>{ cat._cr=v; cat._fill.setAttribute('r',v);  cat._ring.setAttribute('r',v+3); }},
         // emoji back to L0 offset position
         {from:parseFloat(cat._emoji.getAttribute('x')),         to:cat.ocx,          set:v=>cat._emoji.setAttribute('x',v)},
-        {from:parseFloat(cat._emoji.getAttribute('y')),         to:cat.ocy-catBR*0.14, set:v=>cat._emoji.setAttribute('y',v)},
-        {from:parseFloat(cat._emoji.getAttribute('font-size')), to:catBR*0.42,        set:v=>cat._emoji.setAttribute('font-size',v)},
+        {from:parseFloat(cat._emoji.getAttribute('y')),         to:cat.ocy-cat.or*0.14, set:v=>cat._emoji.setAttribute('y',v)},
+        {from:parseFloat(cat._emoji.getAttribute('font-size')), to:cat.or*0.42,        set:v=>cat._emoji.setAttribute('font-size',v)},
         // name back to L0 offset position
-        {from:parseFloat(cat._name.getAttribute('x')), to:cat.ocx,          set:v=>cat._name.setAttribute('x',v)},
-        {from:parseFloat(cat._name.getAttribute('y')), to:cat.ocy+catBR*0.33, set:v=>cat._name.setAttribute('y',v)},
+        {from:parseFloat(cat._name.getAttribute('x')), to:cat.ocx,           set:v=>cat._name.setAttribute('x',v)},
+        {from:parseFloat(cat._name.getAttribute('y')), to:cat.ocy+cat.or*0.33, set:v=>cat._name.setAttribute('y',v)},
         // opacities back to L0 values
         {from:parseFloat(cat._fill.getAttribute('opacity')),  to:0.09, set:v=>cat._fill.setAttribute('opacity',v)},
         {from:parseFloat(cat._ring.getAttribute('opacity')),  to:0.22, set:v=>cat._ring.setAttribute('opacity',v)},
@@ -908,8 +924,8 @@ document.getElementById('panel').addEventListener('touchend',e=>{ if(e.changedTo
 const legEl = document.getElementById('legend');
 const _tierIcon = {core:'●', major:'◉', emerging:'○'};
 const _tierLabel = {core:'Core', major:'Major', emerging:'Emerging'};
-// Sort legend same order as orbital layout (by weight descending)
-const _legSorted = [...CATS].sort((a,b)=>b.weight-a.weight);
+// Sort legend same order as orbital layout (by angularIndex)
+const _legSorted = [...CATS].sort((a,b)=>a.angularIndex-b.angularIndex);
 _legSorted.forEach(cat=>{
   const c = document.createElement('div');
   c.className='lchip';

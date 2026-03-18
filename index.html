@@ -2,24 +2,796 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>State of AI · 2025</title>
   <style>
-    body {
-      font-family: sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      background: #f0f4f8;
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #04040f;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+      color: #fff;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
     }
-    h1 {
-      color: #333;
+
+    /* ── Header ─────────────────────────────────────────────── */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 18px 20px 24px;
+      background: linear-gradient(to bottom, rgba(4,4,15,1) 55%, transparent);
+      pointer-events: none;
+    }
+    #header h1 {
+      font-size: 20px; font-weight: 800; letter-spacing: -0.4px;
+      background: linear-gradient(130deg, #fff 0%, #a5b4fc 60%, #818cf8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    #header p {
+      font-size: 11px; color: rgba(255,255,255,0.38);
+      margin-top: 3px; letter-spacing: 0.3px;
+    }
+
+    /* ── Nav / Back ──────────────────────────────────────────── */
+    #nav-bar {
+      position: fixed; top: 68px; left: 16px; right: 16px; z-index: 100;
+      display: flex; align-items: center; gap: 8px;
+      pointer-events: none;
+    }
+    #back-btn {
+      display: none; align-items: center; gap: 5px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 20px; padding: 6px 14px;
+      font-size: 13px; color: #fff; cursor: pointer;
+      pointer-events: all;
+      backdrop-filter: blur(12px);
+      transition: background 0.15s;
+    }
+    #back-btn:active { background: rgba(255,255,255,0.15); }
+    #back-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+    #nav-label {
+      font-size: 13px; font-weight: 600;
+      color: rgba(255,255,255,0.75);
+      opacity: 0; transition: opacity 0.3s;
+    }
+
+    /* ── Main SVG ────────────────────────────────────────────── */
+    #viz { display: block; width: 100%; height: 100%; }
+
+    /* ── Legend strip ────────────────────────────────────────── */
+    #legend {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      padding: 10px 12px 18px;
+      background: linear-gradient(to top, rgba(4,4,15,0.95) 60%, transparent);
+      display: flex; gap: 7px;
+      overflow-x: auto; scrollbar-width: none;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    #legend::-webkit-scrollbar { display: none; }
+    .leg-chip {
+      flex-shrink: 0; scroll-snap-align: start;
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 11px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 20px; font-size: 11px; font-weight: 500;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .leg-chip:active { background: rgba(255,255,255,0.13); }
+    .leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Detail panel ────────────────────────────────────────── */
+    #panel {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+      background: rgba(10, 10, 24, 0.97);
+      border-top: 1px solid rgba(255,255,255,0.09);
+      border-radius: 22px 22px 0 0;
+      padding: 0 22px 44px;
+      transform: translateY(110%);
+      transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+      backdrop-filter: blur(24px);
+      max-height: 72vh; overflow-y: auto;
+    }
+    #panel.open { transform: translateY(0); }
+
+    #panel-handle {
+      width: 38px; height: 4px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 2px;
+      margin: 14px auto 18px;
+    }
+    #panel-cat-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    #panel-cat-dot { width: 9px; height: 9px; border-radius: 50%; }
+    #panel-cat-name { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; opacity: 0.55; }
+    #panel-title { font-size: 30px; font-weight: 800; letter-spacing: -0.6px; margin-bottom: 6px; line-height: 1.1; }
+    #panel-company { font-size: 14px; color: rgba(255,255,255,0.5); margin-bottom: 14px; }
+    #panel-desc { font-size: 15px; line-height: 1.65; color: rgba(255,255,255,0.72); margin-bottom: 20px; }
+
+    #panel-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 22px; }
+    .p-tag {
+      padding: 4px 11px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.2px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.8);
+    }
+    .p-tag.oss {
+      background: rgba(52,211,153,0.12);
+      border-color: rgba(52,211,153,0.28);
+      color: #6ee7b7;
+    }
+
+    #panel-metrics {
+      display: flex; gap: 12px;
+      padding: 16px; border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 16px;
+    }
+    #panel-score-num { font-size: 42px; font-weight: 900; line-height: 1; letter-spacing: -1px; }
+    #panel-score-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 3px; }
+    #bar-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+    #score-bar-bg {
+      height: 6px; border-radius: 3px;
+      background: rgba(255,255,255,0.1); overflow: hidden;
+    }
+    #score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    #panel-year { font-size: 12px; color: rgba(255,255,255,0.38); }
+
+    #panel-close {
+      position: absolute; top: 18px; right: 20px;
+      width: 28px; height: 28px;
+      background: rgba(255,255,255,0.1); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 15px; color: rgba(255,255,255,0.7);
+    }
+    #panel-close:active { background: rgba(255,255,255,0.2); }
+
+    /* ── Pulse animation ─────────────────────────────────────── */
+    @keyframes float {
+      0%, 100% { transform: translate(var(--tx), var(--ty)); }
+      50% { transform: translate(calc(var(--tx) + 1px), calc(var(--ty) - 2px)); }
     }
   </style>
 </head>
 <body>
-  <h1>Hello, World!</h1>
+
+<div id="header">
+  <h1>State of AI &nbsp;·&nbsp; 2025</h1>
+  <p>Tap a domain to explore · tap a technology for details</p>
+</div>
+
+<div id="nav-bar">
+  <button id="back-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    Overview
+  </button>
+  <span id="nav-label"></span>
+</div>
+
+<svg id="viz"></svg>
+
+<div id="legend"></div>
+
+<div id="panel">
+  <div id="panel-handle"></div>
+  <div id="panel-close">×</div>
+  <div id="panel-cat-row">
+    <div id="panel-cat-dot"></div>
+    <span id="panel-cat-name"></span>
+  </div>
+  <div id="panel-title"></div>
+  <div id="panel-company"></div>
+  <div id="panel-desc"></div>
+  <div id="panel-tags"></div>
+  <div id="panel-metrics">
+    <div>
+      <div id="panel-score-num"></div>
+      <div id="panel-score-label">Impact</div>
+    </div>
+    <div id="bar-wrap">
+      <div id="score-bar-bg"><div id="score-bar-fill"></div></div>
+      <div id="panel-year"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════════════════
+const CATS = [
+  {
+    id: "llm", name: "Language Models", emoji: "🧠",
+    color: "#818cf8", glow: "#4f46e5",
+    desc: "Foundation models for understanding & generating text",
+    techs: [
+      { name: "GPT-4o",        company: "OpenAI",      score: 95, open: false, year: 2024,
+        tags: ["multimodal","commercial"],
+        desc: "OpenAI's flagship model with native voice, vision, and text capabilities powering ChatGPT." },
+      { name: "Claude 3.5",    company: "Anthropic",   score: 93, open: false, year: 2024,
+        tags: ["reasoning","safety"],
+        desc: "Anthropic's top model, praised for nuanced reasoning, safety focus, and coding excellence." },
+      { name: "Gemini 1.5 Pro",company: "Google",      score: 90, open: false, year: 2024,
+        tags: ["long-context","multimodal"],
+        desc: "Google's model with a 1 million token context window — processes entire codebases or films." },
+      { name: "Llama 3.3",     company: "Meta",        score: 86, open: true,  year: 2024,
+        tags: ["open-source","efficient"],
+        desc: "Meta's openly-released frontier model enabling the entire open-source AI ecosystem." },
+      { name: "DeepSeek-V3",   company: "DeepSeek",    score: 85, open: true,  year: 2024,
+        tags: ["open-source","efficient"],
+        desc: "Chinese open model rivaling GPT-4 at a fraction of the training cost — a market shock." },
+      { name: "Mistral Large", company: "Mistral AI",  score: 80, open: true,  year: 2024,
+        tags: ["efficient","European"],
+        desc: "European open-weight frontier model, notably efficient and instruction-tuned." },
+      { name: "Qwen 2.5",      company: "Alibaba",     score: 82, open: true,  year: 2024,
+        tags: ["multilingual","open-source"],
+        desc: "Alibaba's multilingual open model with strong math, code, and reasoning capabilities." },
+      { name: "Grok-2",        company: "xAI",         score: 77, open: false, year: 2024,
+        tags: ["commercial","real-time"],
+        desc: "Elon Musk's AI with live access to X (Twitter) data and irreverent personality." },
+      { name: "Command R+",    company: "Cohere",      score: 74, open: false, year: 2024,
+        tags: ["RAG","enterprise"],
+        desc: "Enterprise-focused model highly optimised for retrieval-augmented generation pipelines." },
+    ]
+  },
+  {
+    id: "reasoning", name: "Reasoning Models", emoji: "⚡",
+    color: "#c084fc", glow: "#7c3aed",
+    desc: "Models that think step-by-step to tackle hard problems",
+    techs: [
+      { name: "o3",              company: "OpenAI",     score: 97, open: false, year: 2025,
+        tags: ["chain-of-thought","SOTA"],
+        desc: "OpenAI's most powerful model — achieves near-human scores on PhD-level science benchmarks." },
+      { name: "o1",              company: "OpenAI",     score: 89, open: false, year: 2024,
+        tags: ["chain-of-thought"],
+        desc: "The first model that 'thinks before it answers', unlocking complex multi-step reasoning." },
+      { name: "DeepSeek-R1",     company: "DeepSeek",   score: 88, open: true,  year: 2025,
+        tags: ["open-source","chain-of-thought"],
+        desc: "Fully open reasoning model matching o1 performance, released for free — disrupted the market." },
+      { name: "Gemini 2 Thinking",company: "Google",    score: 85, open: false, year: 2025,
+        tags: ["efficient","chain-of-thought"],
+        desc: "Google's fast thinking model that shows its reasoning steps in real-time." },
+      { name: "QwQ-32B",         company: "Alibaba",    score: 81, open: true,  year: 2025,
+        tags: ["open-source"],
+        desc: "Alibaba's open reasoning model with strong math, coding, and scientific capabilities." },
+    ]
+  },
+  {
+    id: "image", name: "Image Generation", emoji: "🎨",
+    color: "#f472b6", glow: "#db2777",
+    desc: "AI that creates stunning images from text descriptions",
+    techs: [
+      { name: "Midjourney v6",    company: "Midjourney",      score: 93, open: false, year: 2024,
+        tags: ["artistic","photorealistic"],
+        desc: "The gold standard for AI art — unmatched aesthetic quality used by designers and filmmakers." },
+      { name: "Flux 1.1 Pro",     company: "Black Forest Labs",score: 91, open: true,  year: 2024,
+        tags: ["open-source","photorealistic"],
+        desc: "State-of-the-art open model from ex-Stability AI founders, redefining photorealism." },
+      { name: "Imagen 3",         company: "Google",           score: 88, open: false, year: 2024,
+        tags: ["photorealistic"],
+        desc: "Google's latest high-fidelity image generator integrated into Workspace and Gemini." },
+      { name: "DALL-E 3",         company: "OpenAI",           score: 87, open: false, year: 2023,
+        tags: ["prompt-following","commercial"],
+        desc: "Best-in-class prompt adherence, deeply integrated into ChatGPT for instant image creation." },
+      { name: "Ideogram 2",       company: "Ideogram",         score: 84, open: false, year: 2024,
+        tags: ["text-in-image"],
+        desc: "Best AI for generating images with accurate, readable text rendered inside them." },
+      { name: "Stable Diffusion 3",company: "Stability AI",    score: 82, open: true,  year: 2024,
+        tags: ["open-source","customizable"],
+        desc: "Open foundation enabling thousands of fine-tuned models, styles, and LoRAs." },
+      { name: "Firefly 3",        company: "Adobe",            score: 79, open: false, year: 2024,
+        tags: ["commercially-safe"],
+        desc: "Adobe's commercially-safe AI art tool trained exclusively on licensed content." },
+    ]
+  },
+  {
+    id: "video", name: "Video Generation", emoji: "🎬",
+    color: "#fb923c", glow: "#ea580c",
+    desc: "AI that generates high-fidelity video from text or images",
+    techs: [
+      { name: "Sora",           company: "OpenAI",   score: 92, open: false, year: 2024,
+        tags: ["text-to-video","world-model"],
+        desc: "OpenAI's world-simulation model generating up to 60-second cinematic videos from prompts." },
+      { name: "Veo 2",          company: "Google",   score: 89, open: false, year: 2024,
+        tags: ["cinematic","4K"],
+        desc: "Google's video model with remarkable physical realism and cinematic camera movement." },
+      { name: "Runway Gen-3",   company: "Runway",   score: 86, open: false, year: 2024,
+        tags: ["professional","editing"],
+        desc: "Professional-grade generation and editing tool trusted by the film and media industry." },
+      { name: "Kling 2",        company: "Kuaishou", score: 84, open: false, year: 2024,
+        tags: ["long-form","realistic"],
+        desc: "Leading Chinese video model capable of longer, physics-accurate video generation." },
+      { name: "Wan 2.1",        company: "Alibaba",  score: 83, open: true,  year: 2025,
+        tags: ["open-source"],
+        desc: "Alibaba's open-source video generation model competing with commercial offerings." },
+      { name: "Pika 2",         company: "Pika Labs",score: 78, open: false, year: 2024,
+        tags: ["accessible","effects"],
+        desc: "Consumer-friendly video AI with creative special effects and easy-to-use interface." },
+    ]
+  },
+  {
+    id: "audio", name: "Audio & Music", emoji: "🎵",
+    color: "#34d399", glow: "#059669",
+    desc: "AI for voice synthesis, speech recognition & music creation",
+    techs: [
+      { name: "ElevenLabs",  company: "ElevenLabs",     score: 93, open: false, year: 2023,
+        tags: ["voice-clone","TTS"],
+        desc: "Industry-leading voice synthesis with ultra-realistic cloning from just seconds of audio." },
+      { name: "Suno v4",     company: "Suno",            score: 90, open: false, year: 2024,
+        tags: ["music","full-song"],
+        desc: "Generate complete, professionally-sounding songs with lyrics and all instrumentation from a prompt." },
+      { name: "Whisper v3",  company: "OpenAI",          score: 89, open: true,  year: 2023,
+        tags: ["speech-to-text","open-source","multilingual"],
+        desc: "Robust open-source speech recognition supporting 100+ languages with near-human accuracy." },
+      { name: "Udio",        company: "Udio",            score: 87, open: false, year: 2024,
+        tags: ["music","studio-quality"],
+        desc: "High-quality music generation with remarkable genre fidelity and production polish." },
+      { name: "Lyria",       company: "Google DeepMind", score: 83, open: false, year: 2024,
+        tags: ["music","high-fidelity"],
+        desc: "Google's music model known for rich harmonic structure and instrumental accuracy." },
+      { name: "AudioCraft",  company: "Meta",            score: 80, open: true,  year: 2023,
+        tags: ["open-source","sound-effects"],
+        desc: "Meta's open audio generation framework for music, melodies, and environmental sounds." },
+    ]
+  },
+  {
+    id: "code", name: "Code & Dev Tools", emoji: "💻",
+    color: "#38bdf8", glow: "#0284c7",
+    desc: "AI tools reshaping how software is written and shipped",
+    techs: [
+      { name: "GitHub Copilot",company: "Microsoft",  score: 91, open: false, year: 2022,
+        tags: ["IDE","widespread","inline"],
+        desc: "The most widely-deployed AI coding assistant, used by 1M+ developers inside VS Code and JetBrains." },
+      { name: "Cursor",        company: "Anysphere",  score: 90, open: false, year: 2024,
+        tags: ["IDE","agentic"],
+        desc: "AI-first editor that understands your entire codebase — the editor of choice for AI-native devs." },
+      { name: "Claude Code",   company: "Anthropic",  score: 89, open: false, year: 2025,
+        tags: ["agentic","CLI","terminal"],
+        desc: "Agentic CLI tool (the one writing this!) that autonomously reads, edits, and runs code in your terminal." },
+      { name: "Devin",         company: "Cognition",  score: 86, open: false, year: 2024,
+        tags: ["autonomous","agent"],
+        desc: "First AI software engineer — given a task, it plans, codes, tests, and ships independently." },
+      { name: "Windsurf",      company: "Codeium",    score: 85, open: false, year: 2024,
+        tags: ["IDE","flows"],
+        desc: "AI development environment with 'Flows' for seamless co-pilots and autonomous coding streaks." },
+      { name: "AlphaCode 2",   company: "DeepMind",   score: 84, open: false, year: 2023,
+        tags: ["competitive","research"],
+        desc: "Competitive-programming AI surpassing 85% of human contestants on coding challenges." },
+      { name: "Codestral",     company: "Mistral AI", score: 82, open: true,  year: 2024,
+        tags: ["open-source","code-model"],
+        desc: "Specialised open code model supporting 80+ languages, fast and efficient to self-host." },
+    ]
+  },
+  {
+    id: "agents", name: "AI Agents", emoji: "🤖",
+    color: "#facc15", glow: "#b45309",
+    desc: "Autonomous AI systems that plan, act, and use tools",
+    techs: [
+      { name: "Operator",       company: "OpenAI",               score: 87, open: false, year: 2025,
+        tags: ["web-browser","autonomous"],
+        desc: "OpenAI's AI agent that browses the web and completes real tasks — booking, ordering, researching." },
+      { name: "Computer Use",   company: "Anthropic",             score: 85, open: false, year: 2024,
+        tags: ["computer-control","autonomous"],
+        desc: "Claude controlling a computer's mouse and keyboard directly to complete any desktop task." },
+      { name: "Project Mariner",company: "Google",                score: 82, open: false, year: 2024,
+        tags: ["web-browser","Chrome"],
+        desc: "Google's in-browser agent that navigates, clicks, and fills forms autonomously in Chrome." },
+      { name: "LangGraph",      company: "LangChain",             score: 80, open: true,  year: 2024,
+        tags: ["framework","multi-agent","open-source"],
+        desc: "Graph-based framework for building stateful, cyclical multi-agent AI applications." },
+      { name: "CrewAI",         company: "CrewAI",                score: 77, open: true,  year: 2024,
+        tags: ["multi-agent","role-playing","open-source"],
+        desc: "Orchestrate teams of role-playing AI agents collaborating to solve complex tasks." },
+      { name: "AutoGPT",        company: "Significant Gravitas",  score: 70, open: true,  year: 2023,
+        tags: ["pioneering","open-source"],
+        desc: "The original open-source AI agent — sparked the autonomous AI revolution in early 2023." },
+    ]
+  },
+  {
+    id: "robotics", name: "Robotics & Embodied", emoji: "🦾",
+    color: "#e879f9", glow: "#a21caf",
+    desc: "AI in physical systems interacting with the real world",
+    techs: [
+      { name: "Atlas",         company: "Boston Dynamics",      score: 89, open: false, year: 2024,
+        tags: ["humanoid","dynamic","research"],
+        desc: "World's most dynamic humanoid robot — does parkour, backflips, and complex tool use." },
+      { name: "Figure 02",     company: "Figure AI",            score: 87, open: false, year: 2024,
+        tags: ["humanoid","commercial"],
+        desc: "Commercial humanoid deploying in BMW factories, trained with OpenAI's language models." },
+      { name: "Optimus Gen 2", company: "Tesla",                score: 85, open: false, year: 2024,
+        tags: ["humanoid","mass-production"],
+        desc: "Tesla's humanoid robot targeting mass production for factories and eventually homes." },
+      { name: "π0 (Pi Zero)",  company: "Physical Intelligence", score: 84, open: false, year: 2024,
+        tags: ["foundation-model","general-purpose"],
+        desc: "First general-purpose robot foundation model — fine-tunable for any physical manipulation task." },
+      { name: "RT-2",          company: "Google DeepMind",      score: 83, open: false, year: 2023,
+        tags: ["vision-language-action","research"],
+        desc: "Robotic Transformer using internet knowledge to understand novel natural-language commands." },
+      { name: "Spot",          company: "Boston Dynamics",      score: 80, open: false, year: 2023,
+        tags: ["quadruped","industrial"],
+        desc: "Widely-deployed quadruped robot for industrial inspection, mapping, and remote monitoring." },
+      { name: "1X NEO",        company: "1X Technologies",      score: 77, open: false, year: 2024,
+        tags: ["humanoid","home"],
+        desc: "Humanoid designed for everyday home and office tasks, backed by OpenAI." },
+    ]
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════════════════════════════════
+const W = window.innerWidth;
+const H = window.innerHeight;
+
+const svg = d3.select("#viz").attr("width", W).attr("height", H);
+const defs = svg.append("defs");
+
+// glow filters per category
+CATS.forEach(cat => {
+  const f = defs.append("filter")
+    .attr("id", `glow-${cat.id}`)
+    .attr("x", "-60%").attr("y", "-60%")
+    .attr("width", "220%").attr("height", "220%");
+  f.append("feGaussianBlur").attr("stdDeviation", "5").attr("result", "blur");
+  const fm = f.append("feMerge");
+  fm.append("feMergeNode").attr("in", "blur");
+  fm.append("feMergeNode").attr("in", "SourceGraphic");
+});
+
+// subtle glow for category rings
+CATS.forEach(cat => {
+  const f2 = defs.append("filter")
+    .attr("id", `ringlow-${cat.id}`)
+    .attr("x", "-20%").attr("y", "-20%")
+    .attr("width", "140%").attr("height", "140%");
+  f2.append("feGaussianBlur").attr("stdDeviation", "8").attr("result", "blur");
+  const fm2 = f2.append("feMerge");
+  fm2.append("feMergeNode").attr("in", "blur");
+  fm2.append("feMergeNode").attr("in", "SourceGraphic");
+});
+
+// starfield (static, not part of zoomable group)
+const starsBg = svg.append("g").attr("pointer-events", "none");
+d3.range(200).forEach(() => {
+  starsBg.append("circle")
+    .attr("cx", Math.random() * W)
+    .attr("cy", Math.random() * H)
+    .attr("r", Math.random() * 1.3 + 0.1)
+    .attr("fill", "white")
+    .attr("opacity", Math.random() * 0.45 + 0.05);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  HIERARCHY + PACK
+// ═══════════════════════════════════════════════════════════════════
+const PADDING = 48; // extra room for header/legend
+const packW = W;
+const packH = H - PADDING;
+
+const hierarchy = d3.hierarchy({
+  name: "root",
+  children: CATS.map(c => ({
+    ...c,
+    children: c.techs.map(t => ({ ...t, value: t.score }))
+  }))
+})
+  .sum(d => d.value || 0)
+  .sort((a, b) => b.value - a.value);
+
+d3.pack().size([packW, packH - 20]).padding(d => d.depth === 0 ? 8 : 5)(hierarchy);
+
+// shift everything down a bit to clear header
+hierarchy.descendants().forEach(d => { d.y += PADDING * 0.5 + 14; });
+
+// ═══════════════════════════════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════════════════════════════
+const gMain = svg.append("g");
+
+// ── Category rings (depth 1) ─────────────────────────────────────
+const catNodes = hierarchy.children;
+const catRings = gMain.append("g").attr("class", "cat-rings");
+
+catNodes.forEach(cn => {
+  const cat = CATS.find(c => c.id === cn.data.id);
+  // outer glow ring
+  catRings.append("circle")
+    .attr("cx", cn.x).attr("cy", cn.y).attr("r", cn.r + 2)
+    .attr("fill", "none")
+    .attr("stroke", cat.color)
+    .attr("stroke-width", 1.5)
+    .attr("opacity", 0.25)
+    .attr("filter", `url(#ringlow-${cat.id})`);
+  // fill
+  catRings.append("circle")
+    .attr("cx", cn.x).attr("cy", cn.y).attr("r", cn.r)
+    .attr("fill", cat.glow)
+    .attr("opacity", 0.07);
+});
+
+// ── Tech bubbles (depth 2 / leaf) ────────────────────────────────
+const techGroup = gMain.append("g").attr("class", "techs");
+
+hierarchy.descendants().filter(d => d.depth === 2).forEach(d => {
+  const cat = CATS.find(c => c.id === d.parent.data.id);
+  const g = techGroup.append("g")
+    .attr("class", "tech-node")
+    .attr("data-id", d.data.name)
+    .style("cursor", "pointer");
+
+  // bubble
+  g.append("circle")
+    .attr("cx", d.x).attr("cy", d.y).attr("r", d.r)
+    .attr("fill", cat.color)
+    .attr("opacity", 0.82)
+    .attr("filter", `url(#glow-${cat.id})`)
+    .attr("stroke", "rgba(255,255,255,0.15)")
+    .attr("stroke-width", 0.8);
+
+  // label (only if large enough)
+  if (d.r >= 14) {
+    g.append("text")
+      .attr("x", d.x).attr("y", d.y)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "central")
+      .attr("fill", "white")
+      .attr("font-size", Math.max(Math.min(d.r * 0.45, 11), 7))
+      .attr("font-weight", "700")
+      .attr("pointer-events", "none")
+      .text(shortenName(d.data.name));
+  }
+});
+
+// ── Category labels ──────────────────────────────────────────────
+const catLabelGroup = gMain.append("g").attr("class", "cat-labels").attr("pointer-events", "none");
+
+catNodes.forEach(cn => {
+  const cat = CATS.find(c => c.id === cn.data.id);
+  const g = catLabelGroup.append("g");
+
+  g.append("text")
+    .attr("x", cn.x).attr("y", cn.y - cn.r * 0.18)
+    .attr("text-anchor", "middle").attr("dominant-baseline", "central")
+    .attr("font-size", Math.max(cn.r * 0.27, 14))
+    .attr("fill", "white").attr("opacity", 0.88)
+    .attr("font-weight", "800")
+    .attr("letter-spacing", "-0.3px")
+    .text(cat.emoji);
+
+  const nameFontSize = Math.min(Math.max(cn.r * 0.12, 9), 13);
+  g.append("text")
+    .attr("x", cn.x).attr("y", cn.y + cn.r * 0.2)
+    .attr("text-anchor", "middle").attr("dominant-baseline", "central")
+    .attr("font-size", nameFontSize)
+    .attr("fill", "white").attr("opacity", 0.65)
+    .attr("font-weight", "600")
+    .text(cat.name);
+});
+
+// ── Invisible hit zones for categories ──────────────────────────
+const catHitGroup = gMain.append("g").attr("class", "cat-hits");
+catNodes.forEach(cn => {
+  catHitGroup.append("circle")
+    .attr("cx", cn.x).attr("cy", cn.y).attr("r", cn.r)
+    .attr("fill", "transparent")
+    .attr("data-catid", cn.data.id)
+    .style("cursor", "pointer");
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  ZOOM STATE
+// ═══════════════════════════════════════════════════════════════════
+let currentFocus = null; // null = overview
+let zoomed = false;
+
+// zoom viewport → [centerX, centerY, diameter]
+let view = [hierarchy.x, hierarchy.y, Math.max(W, H) * 1.3];
+applyView(view, false);
+
+function applyView([cx, cy, diam], animate) {
+  const scale = Math.min(W, H) / diam;
+  const tx = W / 2 - cx * scale;
+  const ty = H / 2 - cy * scale;
+  const t = gMain.transition().duration(animate ? 700 : 0).ease(d3.easeCubicInOut);
+  t.attr("transform", `translate(${tx},${ty}) scale(${scale})`);
+}
+
+function zoomToNode(node) {
+  const margin = node.depth === 1 ? 2.4 : 2;
+  view = [node.x, node.y, node.r * margin];
+  applyView(view, true);
+}
+
+function zoomOut() {
+  view = [hierarchy.x, hierarchy.y, Math.max(W, H) * 1.3];
+  applyView(view, true);
+  currentFocus = null;
+  zoomed = false;
+  updateNav();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  INTERACTION
+// ═══════════════════════════════════════════════════════════════════
+// Category hit zones
+catHitGroup.selectAll("circle").on("click pointerup", function(event) {
+  event.stopPropagation();
+  if (isPanelOpen()) { closePanel(); return; }
+  const catId = this.getAttribute("data-catid");
+  const cn = catNodes.find(n => n.data.id === catId);
+  if (!cn) return;
+  currentFocus = catId;
+  zoomed = true;
+  zoomToNode(cn);
+  updateNav(catId);
+});
+
+// Tech bubbles
+techGroup.selectAll(".tech-node").on("click pointerup", function(event) {
+  event.stopPropagation();
+  const name = this.getAttribute("data-id");
+  const d = hierarchy.descendants().find(n => n.depth === 2 && n.data.name === name);
+  if (!d) return;
+  openPanel(d.data, d.parent.data.id);
+});
+
+// Background tap = close panel or zoom out
+svg.on("click", () => {
+  if (isPanelOpen()) { closePanel(); return; }
+  if (zoomed) zoomOut();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  NAV
+// ═══════════════════════════════════════════════════════════════════
+function updateNav(catId) {
+  const backBtn = document.getElementById("back-btn");
+  const navLabel = document.getElementById("nav-label");
+  if (!catId) {
+    backBtn.style.display = "none";
+    navLabel.style.opacity = "0";
+  } else {
+    backBtn.style.display = "flex";
+    const cat = CATS.find(c => c.id === catId);
+    navLabel.textContent = cat ? `${cat.emoji}  ${cat.name}` : "";
+    navLabel.style.opacity = "1";
+  }
+}
+
+document.getElementById("back-btn").addEventListener("click", e => {
+  e.stopPropagation();
+  closePanel();
+  zoomOut();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  DETAIL PANEL
+// ═══════════════════════════════════════════════════════════════════
+function openPanel(tech, catId) {
+  const cat = CATS.find(c => c.id === catId);
+
+  document.getElementById("panel-cat-dot").style.background = cat.color;
+  document.getElementById("panel-cat-name").textContent = cat.name;
+  document.getElementById("panel-cat-name").style.color = cat.color;
+  document.getElementById("panel-title").textContent = tech.name;
+  document.getElementById("panel-title").style.color = cat.color;
+  document.getElementById("panel-company").textContent = tech.company;
+  document.getElementById("panel-desc").textContent = tech.desc;
+  document.getElementById("panel-score-num").textContent = tech.score;
+  document.getElementById("panel-score-num").style.color = cat.color;
+  document.getElementById("score-bar-fill").style.width = tech.score + "%";
+  document.getElementById("score-bar-fill").style.background =
+    `linear-gradient(90deg, ${cat.glow}, ${cat.color})`;
+  document.getElementById("panel-year").textContent = `Released  ${tech.year}`;
+
+  const tagsEl = document.getElementById("panel-tags");
+  tagsEl.innerHTML = "";
+  tech.tags.forEach(tag => {
+    const s = document.createElement("span");
+    s.className = "p-tag";
+    s.textContent = tag.replace(/-/g, " ");
+    s.style.borderColor = cat.color + "44";
+    tagsEl.appendChild(s);
+  });
+  if (tech.open) {
+    const s = document.createElement("span");
+    s.className = "p-tag oss";
+    s.textContent = "open source";
+    tagsEl.appendChild(s);
+  }
+
+  document.getElementById("panel").classList.add("open");
+}
+
+function closePanel() {
+  document.getElementById("panel").classList.remove("open");
+}
+
+function isPanelOpen() {
+  return document.getElementById("panel").classList.contains("open");
+}
+
+document.getElementById("panel-close").addEventListener("click", e => {
+  e.stopPropagation(); closePanel();
+});
+document.getElementById("panel-handle").addEventListener("click", e => {
+  e.stopPropagation(); closePanel();
+});
+
+// swipe down to close panel
+let touchStartY = 0;
+document.getElementById("panel").addEventListener("touchstart", e => {
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+document.getElementById("panel").addEventListener("touchend", e => {
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (dy > 60) closePanel();
+}, { passive: true });
+
+// ═══════════════════════════════════════════════════════════════════
+//  LEGEND STRIP
+// ═══════════════════════════════════════════════════════════════════
+const legendEl = document.getElementById("legend");
+CATS.forEach(cat => {
+  const chip = document.createElement("div");
+  chip.className = "leg-chip";
+  chip.innerHTML = `<div class="leg-dot" style="background:${cat.color}"></div><span>${cat.emoji} ${cat.name}</span>`;
+  chip.addEventListener("click", e => {
+    e.stopPropagation();
+    closePanel();
+    const cn = catNodes.find(n => n.data.id === cat.id);
+    if (cn) {
+      currentFocus = cat.id;
+      zoomed = true;
+      zoomToNode(cn);
+      updateNav(cat.id);
+    }
+  });
+  legendEl.appendChild(chip);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  UTIL
+// ═══════════════════════════════════════════════════════════════════
+function shortenName(name) {
+  // Keep concise for small bubbles
+  const abbr = {
+    "GitHub Copilot": "Copilot",
+    "Stable Diffusion 3": "SD 3",
+    "Optimus Gen 2": "Optimus",
+    "Gemini 1.5 Pro": "Gemini 1.5",
+    "Gemini 2 Thinking": "Gem Thinking",
+    "Flux 1.1 Pro": "Flux 1.1",
+    "Midjourney v6": "Midjourney",
+    "Runway Gen-3": "Runway",
+    "DeepSeek-R1": "DS-R1",
+    "DeepSeek-V3": "DS-V3",
+    "Project Mariner": "Mariner",
+    "AlphaCode 2": "AlphaCode",
+    "Figure 02": "Figure",
+    "π0 (Pi Zero)": "π0",
+    "1X NEO": "1X NEO",
+    "RT-2": "RT-2",
+    "AudioCraft": "AudioCraft",
+    "LangGraph": "LangGraph",
+    "Computer Use": "Comp.Use",
+  };
+  return abbr[name] || name;
+}
+</script>
 </body>
 </html>

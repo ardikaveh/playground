@@ -87,7 +87,8 @@
     #pcatdot { width: 9px; height: 9px; border-radius: 50%; }
     #pcatname { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; opacity: 0.55; }
     #ptitle { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 5px; line-height: 1.1; }
-    #pco { font-size: 14px; color: rgba(255,255,255,0.48); margin-bottom: 13px; }
+    #pco { font-size: 14px; color: rgba(255,255,255,0.48); margin-bottom: 6px; }
+    #pcatmeta { font-size: 11px; color: rgba(255,255,255,0.38); letter-spacing: 0.4px; margin-bottom: 13px; }
     #pdesc { font-size: 15px; line-height: 1.65; color: rgba(255,255,255,0.72); margin-bottom: 18px; }
     #ptags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 20px; }
     .ptag {
@@ -154,6 +155,7 @@
   <div id="pcatrow"><div id="pcatdot"></div><span id="pcatname"></span></div>
   <div id="ptitle"></div>
   <div id="pco"></div>
+  <div id="pcatmeta"></div>
   <div id="pdesc"></div>
   <div id="ptags"></div>
   <div id="pmets">
@@ -173,6 +175,7 @@ const CATS = [
   {
     id:"llm", name:"Language Models", emoji:"🧠",
     color:"#818cf8", glow:"#4f46e5",
+    weight:1.5, tier:"core", momentum:"explosive", maturity:"established",
     techs:[
       {name:"GPT-4o",       company:"OpenAI",      score:95, open:false, year:2024, tags:["multimodal","commercial"],
        desc:"OpenAI's flagship model with native voice, vision & text powering ChatGPT."},
@@ -197,6 +200,7 @@ const CATS = [
   {
     id:"reasoning", name:"Reasoning Models", emoji:"⚡",
     color:"#c084fc", glow:"#7c3aed",
+    weight:1.25, tier:"major", momentum:"explosive", maturity:"growing",
     techs:[
       {name:"o3",               company:"OpenAI",   score:97, open:false, year:2025, tags:["chain-of-thought","SOTA"],
        desc:"OpenAI's most powerful model — near-human scores on PhD-level science benchmarks."},
@@ -213,6 +217,7 @@ const CATS = [
   {
     id:"image", name:"Image Generation", emoji:"🎨",
     color:"#f472b6", glow:"#db2777",
+    weight:1.0, tier:"major", momentum:"steady", maturity:"established",
     techs:[
       {name:"Midjourney v6",   company:"Midjourney",       score:93, open:false, year:2024, tags:["artistic","photorealistic"],
        desc:"The gold standard for AI art — unmatched aesthetic quality used by designers worldwide."},
@@ -233,6 +238,7 @@ const CATS = [
   {
     id:"video", name:"Video Generation", emoji:"🎬",
     color:"#fb923c", glow:"#ea580c",
+    weight:0.9, tier:"emerging", momentum:"explosive", maturity:"growing",
     techs:[
       {name:"Sora",         company:"OpenAI",   score:92, open:false, year:2024, tags:["text-to-video","world-model"],
        desc:"OpenAI's world-simulation model generating up to 60-second cinematic videos."},
@@ -251,6 +257,7 @@ const CATS = [
   {
     id:"audio", name:"Audio & Music", emoji:"🎵",
     color:"#34d399", glow:"#059669",
+    weight:0.8, tier:"emerging", momentum:"building", maturity:"growing",
     techs:[
       {name:"ElevenLabs", company:"ElevenLabs",    score:93, open:false, year:2023, tags:["voice-clone","TTS"],
        desc:"Industry-leading voice synthesis with ultra-realistic cloning from seconds of audio."},
@@ -269,6 +276,7 @@ const CATS = [
   {
     id:"code", name:"Code & Dev Tools", emoji:"💻",
     color:"#38bdf8", glow:"#0284c7",
+    weight:1.2, tier:"major", momentum:"steady", maturity:"established",
     techs:[
       {name:"GitHub Copilot",company:"Microsoft", score:91, open:false, year:2022, tags:["IDE","widespread"],
        desc:"The most widely-deployed AI coding assistant, used by 1M+ developers in VS Code."},
@@ -289,6 +297,7 @@ const CATS = [
   {
     id:"agents", name:"AI Agents", emoji:"🤖",
     color:"#facc15", glow:"#b45309",
+    weight:1.4, tier:"core", momentum:"explosive", maturity:"growing",
     techs:[
       {name:"Operator",       company:"OpenAI",              score:87, open:false, year:2025, tags:["web-browser","autonomous"],
        desc:"OpenAI's AI agent that browses the web and completes real tasks like booking trips."},
@@ -307,6 +316,7 @@ const CATS = [
   {
     id:"robotics", name:"Robotics & Embodied", emoji:"🦾",
     color:"#e879f9", glow:"#a21caf",
+    weight:0.75, tier:"emerging", momentum:"building", maturity:"early",
     techs:[
       {name:"Atlas",        company:"Boston Dynamics",      score:89, open:false, year:2024, tags:["humanoid","dynamic"],
        desc:"World's most dynamic humanoid robot — does parkour, backflips, and complex tool use."},
@@ -359,18 +369,23 @@ const AH = H - HDR - LEG;      // usable height
 const CX = W/2, CY = HDR + AH/2; // visual center
 
 // Category orbital layout
-const orbitR = Math.min(AH/2, W/2) * 0.60;
-const catBR  = orbitR * 0.34; // category bubble radius
+// Expand orbit by 15% to give room for size-varied bubbles
+const orbitR = Math.min(AH/2, W/2) * 0.60 * 1.15;
+const catBR  = orbitR * 0.34 * 0.90; // baseline radius (shrink slightly to compensate)
+
+// Sort cats by weight descending so most important get prime angular positions
+const _sorted = [...CATS].sort((a,b)=>b.weight-a.weight);
+_sorted.forEach((cat,i)=>{ cat._angIdx = i; });
 
 CATS.forEach((cat,i) => {
-  const ang = (i/CATS.length)*2*Math.PI - Math.PI/2;
+  const ang = (cat._angIdx/CATS.length)*2*Math.PI - Math.PI/2;
   cat.ocx = CX + orbitR*Math.cos(ang);
   cat.ocy = CY + orbitR*Math.sin(ang);
-  cat.or  = catBR;
+  cat.or  = catBR * cat.weight; // SIZE varies by importance weight
 
-  // Tech dot positions in OVERVIEW (inside category bubble)
-  const pts = phyllotaxis(cat.techs.length, catBR*0.62);
-  const dotR = Math.max(3, catBR*0.10);
+  // Tech dot positions in OVERVIEW (inside category bubble, scaled to bubble size)
+  const pts = phyllotaxis(cat.techs.length, cat.or*0.62);
+  const dotR = Math.max(3, cat.or*0.10);
   cat.techs.forEach((t,j)=>{
     t.ocx = cat.ocx + pts[j][0];
     t.ocy = cat.ocy + pts[j][1];
@@ -388,13 +403,13 @@ CATS.forEach((cat,i) => {
 });
 
 // Peripheral minimap positions — where non-selected cats live at L1
-const periR     = Math.min(W, H) * 0.42;
-const PERI_R    = Math.max(18, catBR * 0.28); // radius of peripheral bubbles
-CATS.forEach((cat, i) => {
-  const ang = (i/CATS.length)*2*Math.PI - Math.PI/2;
+const periR      = Math.min(W, H) * 0.42;
+const PERI_R_base = Math.max(18, catBR * 0.28); // baseline radius of peripheral bubbles
+CATS.forEach((cat) => {
+  const ang = (cat._angIdx/CATS.length)*2*Math.PI - Math.PI/2; // preserve orbital order
   cat.pcx = CX + periR * Math.cos(ang);
   cat.pcy = CY + periR * Math.sin(ang);
-  cat.pr  = PERI_R;
+  cat.pr  = PERI_R_base * Math.max(0.7, cat.weight * 0.65); // size reflects importance
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -850,6 +865,12 @@ function openPanel(tech, cat) {
   document.getElementById('ptitle').textContent = tech.name;
   document.getElementById('ptitle').style.color  = cat.color;
   document.getElementById('pco').textContent    = tech.company;
+  const _tl = {core:'Core',major:'Major',emerging:'Emerging'};
+  const _ti = {core:'●',major:'◉',emerging:'○'};
+  const _mm = {explosive:'Explosive ↑',steady:'Steady →',building:'Building ↗'};
+  const _mt = {established:'Established',growing:'Growing',early:'Early stage'};
+  document.getElementById('pcatmeta').textContent =
+    `${_ti[cat.tier]} ${_tl[cat.tier]} category · ${_mm[cat.momentum]} momentum · ${_mt[cat.maturity]}`;
   document.getElementById('pdesc').textContent  = tech.desc;
   document.getElementById('pscore').textContent = tech.score;
   document.getElementById('pscore').style.color  = cat.color;
@@ -885,10 +906,15 @@ document.getElementById('panel').addEventListener('touchend',e=>{ if(e.changedTo
 // LEGEND
 // ═══════════════════════════════════════════════════════════════
 const legEl = document.getElementById('legend');
-CATS.forEach(cat=>{
+const _tierIcon = {core:'●', major:'◉', emerging:'○'};
+const _tierLabel = {core:'Core', major:'Major', emerging:'Emerging'};
+// Sort legend same order as orbital layout (by weight descending)
+const _legSorted = [...CATS].sort((a,b)=>b.weight-a.weight);
+_legSorted.forEach(cat=>{
   const c = document.createElement('div');
   c.className='lchip';
-  c.innerHTML=`<div class="ldot" style="background:${cat.color}"></div>${cat.emoji} ${cat.name}`;
+  c.title=`${_tierLabel[cat.tier]} · ${cat.momentum} momentum · ${cat.maturity}`;
+  c.innerHTML=`<div class="ldot" style="background:${cat.color}"></div>${cat.emoji} ${cat.name}<span style="opacity:0.45;font-size:9px;margin-left:3px" title="${_tierLabel[cat.tier]}">${_tierIcon[cat.tier]}</span>`;
   c.addEventListener('click', e=>{ e.stopPropagation(); closePanel(); zoomIn(cat.id); });
   legEl.appendChild(c);
 });

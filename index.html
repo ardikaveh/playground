@@ -107,6 +107,23 @@
     #sbg { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
     #sfill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
     #pyear { font-size: 12px; color: rgba(255,255,255,0.38); }
+
+    /* ── Background tint (L1 context colour) ────────────────── */
+    #tint { position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0; transition:opacity 0.7s; }
+
+    /* ── "Tap to explore" hint ───────────────────────────────── */
+    #hint {
+      position:fixed; bottom:84px; left:50%; transform:translateX(-50%);
+      z-index:200; pointer-events:none;
+      background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14);
+      backdrop-filter:blur(12px); border-radius:20px;
+      padding:8px 18px; font-size:13px; color:rgba(255,255,255,0.65);
+      opacity:0; transition:opacity 0.6s; white-space:nowrap;
+    }
+
+    /* ── Category bubble pulse (L0 affordance) ───────────────── */
+    @keyframes catPulse { 0%,100%{opacity:0.22} 55%{opacity:0.52} }
+    .ring-pulse { animation:catPulse 2.8s ease-in-out infinite; }
   </style>
 </head>
 <body>
@@ -126,6 +143,8 @@
   <span id="navlabel"></span>
 </div>
 
+<div id="tint"></div>
+<div id="hint">Tap a cluster to explore</div>
 <svg id="viz"></svg>
 <div id="legend"></div>
 
@@ -368,6 +387,16 @@ CATS.forEach((cat,i) => {
   });
 });
 
+// Peripheral minimap positions — where non-selected cats live at L1
+const periR     = Math.min(W, H) * 0.42;
+const PERI_R    = Math.max(18, catBR * 0.28); // radius of peripheral bubbles
+CATS.forEach((cat, i) => {
+  const ang = (i/CATS.length)*2*Math.PI - Math.PI/2;
+  cat.pcx = CX + periR * Math.cos(ang);
+  cat.pcy = CY + periR * Math.sin(ang);
+  cat.pr  = PERI_R;
+});
+
 // ═══════════════════════════════════════════════════════════════
 // BUILD SVG
 // ═══════════════════════════════════════════════════════════════
@@ -460,6 +489,27 @@ CATS.forEach(cat=>{
   });
 });
 
+// Track current animated category centre (used for smooth interruption)
+CATS.forEach(cat => { cat._cx=cat.ocx; cat._cy=cat.ocy; cat._cr=cat.or; });
+
+// ── Pulse rings on L0 to signal interactivity ────────────────
+let _pulseActive = true;
+CATS.forEach(cat => cat._ring.classList.add('ring-pulse'));
+function stopPulse() {
+  if (!_pulseActive) return;
+  _pulseActive = false;
+  CATS.forEach(cat => cat._ring.classList.remove('ring-pulse'));
+}
+
+// ── One-time "tap to explore" hint ──────────────────────────
+(function(){
+  const h = document.getElementById('hint');
+  const t1 = setTimeout(()=>{ h.style.opacity='1'; }, 1500);
+  const t2 = setTimeout(()=>{ h.style.opacity='0'; }, 5500);
+  function dismissHint(){ h.style.opacity='0'; clearTimeout(t1); clearTimeout(t2); }
+  svg.addEventListener('pointerdown', dismissHint, {once:true});
+})();
+
 // ═══════════════════════════════════════════════════════════════
 // ANIMATION ENGINE
 // ═══════════════════════════════════════════════════════════════
@@ -485,51 +535,72 @@ let zoomed = null; // null = overview, else catId
 
 function zoomIn(catId) {
   if (zoomed === catId) return;
+  stopPulse();
+  const prevZoomed = zoomed;
   zoomed = catId;
   updateNav(catId);
+  updateTint(catId);
 
-  runAnim(680, () => {
+  const dur = prevZoomed ? 500 : 600; // L1→L1 cross-transition is quicker
+
+  runAnim(dur, () => {
     const tweens = [];
-    // Animate viewport to identity (scale=1, pan=0) so bubbles fill the screen
+    // Viewport → identity (scale=1, pan=0) so bubbles fill the screen
     const _fpx=panX, _fpy=panY, _fs=scale;
     tweens.push({from:0,to:1,set:t=>{
       panX=lerp(_fpx,0,t); panY=lerp(_fpy,0,t); scale=lerp(_fs,1,t); applyTransform();
     }});
+
     CATS.forEach(cat=>{
       const isSel = cat.id === catId;
-
-      // category elements fade out
-      const fromFill = parseFloat(cat._fill.getAttribute('opacity'));
-      const fromRing = parseFloat(cat._ring.getAttribute('opacity'));
-      const fromEmoji = parseFloat(cat._emoji.getAttribute('opacity'));
-      const fromName  = parseFloat(cat._name.getAttribute('opacity'));
-      tweens.push(
-        {from:fromFill,  to:0, set:v=>cat._fill.setAttribute('opacity',v)},
-        {from:fromRing,  to:0, set:v=>cat._ring.setAttribute('opacity',v)},
-        {from:fromEmoji, to:0, set:v=>cat._emoji.setAttribute('opacity',v)},
-        {from:fromName,  to:0, set:v=>cat._name.setAttribute('opacity',v)},
-      );
-
-      cat.techs.forEach(t=>{
-        const fromCx = t._cx, fromCy = t._cy, fromR = t._r;
-        const fromBop = parseFloat(t._bub.getAttribute('opacity'));
-        const fromLop = parseFloat(t._lbl.getAttribute('opacity'));
-
-        let toCx, toCy, toR, toBop, toLop;
-        if (isSel) {
-          toCx=t.zcx; toCy=t.zcy; toR=t.zr; toBop=0.90; toLop=1;
-        } else {
-          toCx=cat.ocx; toCy=cat.ocy; toR=0.1; toBop=0; toLop=0;
-        }
+      if (isSel) {
+        // ── Selected: fade out category bubble; expand tech bubbles ──
         tweens.push(
-          {from:fromCx, to:toCx, set:v=>{t._cx=v; t._bub.setAttribute('cx',v); t._lbl.setAttribute('x',v);}},
-          {from:fromCy, to:toCy, set:v=>{t._cy=v; t._bub.setAttribute('cy',v); t._lbl.setAttribute('y',v);}},
-          {from:fromR,  to:toR,  set:v=>{t._r=v;  t._bub.setAttribute('r',Math.max(0.01,v));
-            if(isSel) t._lbl.setAttribute('font-size',Math.max(6,v*0.38));}},
-          {from:fromBop,to:toBop,set:v=>t._bub.setAttribute('opacity',v)},
-          {from:fromLop,to:toLop,set:v=>t._lbl.setAttribute('opacity',v)},
+          {from:parseFloat(cat._fill.getAttribute('opacity')), to:0, set:v=>cat._fill.setAttribute('opacity',v)},
+          {from:parseFloat(cat._ring.getAttribute('opacity')), to:0, set:v=>cat._ring.setAttribute('opacity',v)},
+          {from:parseFloat(cat._emoji.getAttribute('opacity')),to:0, set:v=>cat._emoji.setAttribute('opacity',v)},
+          {from:parseFloat(cat._name.getAttribute('opacity')), to:0, set:v=>cat._name.setAttribute('opacity',v)},
         );
-      });
+        cat.techs.forEach(t=>{
+          tweens.push(
+            {from:t._cx, to:t.zcx, set:v=>{t._cx=v;t._bub.setAttribute('cx',v);t._lbl.setAttribute('x',v);}},
+            {from:t._cy, to:t.zcy, set:v=>{t._cy=v;t._bub.setAttribute('cy',v);t._lbl.setAttribute('y',v);}},
+            {from:t._r,  to:t.zr,  set:v=>{t._r=v;t._bub.setAttribute('r',Math.max(0.01,v));t._lbl.setAttribute('font-size',Math.max(6,v*0.38));}},
+            {from:parseFloat(t._bub.getAttribute('opacity')), to:0.90, set:v=>t._bub.setAttribute('opacity',v)},
+            {from:parseFloat(t._lbl.getAttribute('opacity')), to:1,    set:v=>t._lbl.setAttribute('opacity',v)},
+          );
+        });
+      } else {
+        // ── Non-selected: shrink to peripheral minimap position ──
+        const fromCx=cat._cx, fromCy=cat._cy, fromCr=cat._cr;
+        tweens.push(
+          {from:fromCx, to:cat.pcx, set:v=>{ cat._cx=v; cat._fill.setAttribute('cx',v); cat._ring.setAttribute('cx',v); }},
+          {from:fromCy, to:cat.pcy, set:v=>{ cat._cy=v; cat._fill.setAttribute('cy',v); cat._ring.setAttribute('cy',v); }},
+          {from:fromCr, to:cat.pr,  set:v=>{ cat._cr=v; cat._fill.setAttribute('r',v);  cat._ring.setAttribute('r',v+2); }},
+          // emoji slides to peripheral centre and shrinks
+          {from:parseFloat(cat._emoji.getAttribute('x')),         to:cat.pcx,            set:v=>cat._emoji.setAttribute('x',v)},
+          {from:parseFloat(cat._emoji.getAttribute('y')),         to:cat.pcy,            set:v=>cat._emoji.setAttribute('y',v)},
+          {from:parseFloat(cat._emoji.getAttribute('font-size')), to:Math.max(10,cat.pr*0.72), set:v=>cat._emoji.setAttribute('font-size',v)},
+          // name moves with bubble but fades out (too small to read)
+          {from:parseFloat(cat._name.getAttribute('x')), to:cat.pcx, set:v=>cat._name.setAttribute('x',v)},
+          {from:parseFloat(cat._name.getAttribute('y')), to:cat.pcy, set:v=>cat._name.setAttribute('y',v)},
+          // opacities
+          {from:parseFloat(cat._fill.getAttribute('opacity')), to:0.15, set:v=>cat._fill.setAttribute('opacity',v)},
+          {from:parseFloat(cat._ring.getAttribute('opacity')), to:0.24, set:v=>cat._ring.setAttribute('opacity',v)},
+          {from:parseFloat(cat._emoji.getAttribute('opacity')),to:0.55, set:v=>cat._emoji.setAttribute('opacity',v)},
+          {from:parseFloat(cat._name.getAttribute('opacity')), to:0,    set:v=>cat._name.setAttribute('opacity',v)},
+        );
+        // tech dots contract to peripheral point (become invisible cluster)
+        cat.techs.forEach(t=>{
+          tweens.push(
+            {from:t._cx, to:cat.pcx, set:v=>{t._cx=v;t._bub.setAttribute('cx',v);}},
+            {from:t._cy, to:cat.pcy, set:v=>{t._cy=v;t._bub.setAttribute('cy',v);}},
+            {from:t._r,  to:0.5,     set:v=>{t._r=v;t._bub.setAttribute('r',Math.max(0.01,v));}},
+            {from:parseFloat(t._bub.getAttribute('opacity')), to:0, set:v=>t._bub.setAttribute('opacity',v)},
+            {from:parseFloat(t._lbl.getAttribute('opacity')), to:0, set:v=>t._lbl.setAttribute('opacity',v)},
+          );
+        });
+      }
     });
     return tweens;
   });
@@ -538,37 +609,45 @@ function zoomIn(catId) {
 function zoomOut() {
   zoomed = null;
   updateNav(null);
+  updateTint(null);
 
-  runAnim(680, () => {
+  runAnim(600, () => {
     const tweens = [];
-    // Animate viewport back to overview fit
+    // Viewport back to L0 fit-to-screen
     const _fpx=panX, _fpy=panY, _fs=scale;
     tweens.push({from:0,to:1,set:t=>{
       panX=lerp(_fpx,initialPanX,t); panY=lerp(_fpy,initialPanY,t);
       scale=lerp(_fs,initialScale,t); applyTransform();
     }});
+
     CATS.forEach(cat=>{
-      const fromFill  = parseFloat(cat._fill.getAttribute('opacity'));
-      const fromRing  = parseFloat(cat._ring.getAttribute('opacity'));
-      const fromEmoji = parseFloat(cat._emoji.getAttribute('opacity'));
-      const fromName  = parseFloat(cat._name.getAttribute('opacity'));
+      // All categories return to their orbital positions
+      const fromCx=cat._cx, fromCy=cat._cy, fromCr=cat._cr;
       tweens.push(
-        {from:fromFill,  to:0.09, set:v=>cat._fill.setAttribute('opacity',v)},
-        {from:fromRing,  to:0.22, set:v=>cat._ring.setAttribute('opacity',v)},
-        {from:fromEmoji, to:0.9,  set:v=>cat._emoji.setAttribute('opacity',v)},
-        {from:fromName,  to:0.65, set:v=>cat._name.setAttribute('opacity',v)},
+        {from:fromCx, to:cat.ocx, set:v=>{ cat._cx=v; cat._fill.setAttribute('cx',v); cat._ring.setAttribute('cx',v); }},
+        {from:fromCy, to:cat.ocy, set:v=>{ cat._cy=v; cat._fill.setAttribute('cy',v); cat._ring.setAttribute('cy',v); }},
+        {from:fromCr, to:cat.or,  set:v=>{ cat._cr=v; cat._fill.setAttribute('r',v);  cat._ring.setAttribute('r',v+3); }},
+        // emoji back to L0 offset position
+        {from:parseFloat(cat._emoji.getAttribute('x')),         to:cat.ocx,          set:v=>cat._emoji.setAttribute('x',v)},
+        {from:parseFloat(cat._emoji.getAttribute('y')),         to:cat.ocy-catBR*0.14, set:v=>cat._emoji.setAttribute('y',v)},
+        {from:parseFloat(cat._emoji.getAttribute('font-size')), to:catBR*0.42,        set:v=>cat._emoji.setAttribute('font-size',v)},
+        // name back to L0 offset position
+        {from:parseFloat(cat._name.getAttribute('x')), to:cat.ocx,          set:v=>cat._name.setAttribute('x',v)},
+        {from:parseFloat(cat._name.getAttribute('y')), to:cat.ocy+catBR*0.33, set:v=>cat._name.setAttribute('y',v)},
+        // opacities back to L0 values
+        {from:parseFloat(cat._fill.getAttribute('opacity')),  to:0.09, set:v=>cat._fill.setAttribute('opacity',v)},
+        {from:parseFloat(cat._ring.getAttribute('opacity')),  to:0.22, set:v=>cat._ring.setAttribute('opacity',v)},
+        {from:parseFloat(cat._emoji.getAttribute('opacity')), to:0.9,  set:v=>cat._emoji.setAttribute('opacity',v)},
+        {from:parseFloat(cat._name.getAttribute('opacity')),  to:0.65, set:v=>cat._name.setAttribute('opacity',v)},
       );
+      // Tech dots return to L0 positions inside category bubble
       cat.techs.forEach(t=>{
-        const fromCx = t._cx, fromCy = t._cy, fromR = t._r;
-        const fromBop = parseFloat(t._bub.getAttribute('opacity'));
-        const fromLop = parseFloat(t._lbl.getAttribute('opacity'));
         tweens.push(
-          {from:fromCx, to:t.ocx, set:v=>{t._cx=v; t._bub.setAttribute('cx',v); t._lbl.setAttribute('x',v);}},
-          {from:fromCy, to:t.ocy, set:v=>{t._cy=v; t._bub.setAttribute('cy',v); t._lbl.setAttribute('y',v);}},
-          {from:fromR,  to:t.or,  set:v=>{t._r=v;  t._bub.setAttribute('r',Math.max(0.01,v));
-            t._lbl.setAttribute('font-size','8');}},
-          {from:fromBop,to:0.88, set:v=>t._bub.setAttribute('opacity',v)},
-          {from:fromLop,to:0,    set:v=>t._lbl.setAttribute('opacity',v)},
+          {from:t._cx, to:t.ocx, set:v=>{t._cx=v;t._bub.setAttribute('cx',v);t._lbl.setAttribute('x',v);}},
+          {from:t._cy, to:t.ocy, set:v=>{t._cy=v;t._bub.setAttribute('cy',v);t._lbl.setAttribute('y',v);}},
+          {from:t._r,  to:t.or,  set:v=>{t._r=v;t._bub.setAttribute('r',Math.max(0.01,v));t._lbl.setAttribute('font-size','8');}},
+          {from:parseFloat(t._bub.getAttribute('opacity')), to:0.88, set:v=>t._bub.setAttribute('opacity',v)},
+          {from:parseFloat(t._lbl.getAttribute('opacity')), to:0,    set:v=>t._lbl.setAttribute('opacity',v)},
         );
       });
     });
@@ -599,8 +678,12 @@ let initialScale = 1, initialPanX = 0, initialPanY = 0;
   panX = initialPanX; panY = initialPanY; scale = initialScale;
 })();
 
-const MIN_SCALE = 0.25, MAX_SCALE = 6;
-const PAN_THRESH = 6;
+// At L1, viewport scale is clamped to [0.80, 2.5] relative to canonical (scale=1).
+// At L0, pan and pinch are disabled — the overview is always at the canonical fit.
+const PAN_THRESH   = 6;
+const L1_MIN_SCALE = 0.80;   // pinch out past this → snap back to L0
+const L1_MAX_SCALE = 2.5;    // pinch in limit at L1
+// L1 snap-back fires when scale < 0.80; pinch-release snaps back to 1.0 if ∉ [0.95,1.0]
 
 function applyTransform() {
   gWrapper.setAttribute('transform', `translate(${panX},${panY}) scale(${scale})`);
@@ -608,7 +691,7 @@ function applyTransform() {
 applyTransform();
 
 // ── Pointer state ────────────────────────────────────────────
-const _ptrs = new Map();           // pointerId → {x, y}
+const _ptrs = new Map();
 let _didPan = false;
 let _pinchActive = false, _snapPending = false;
 let _startX = 0, _startY = 0, _lastX = 0, _lastY = 0;
@@ -635,26 +718,40 @@ svg.addEventListener('pointermove', e=>{
   _ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
 
   if (_pinchActive && _ptrs.size >= 2) {
+    // ── Pinch zoom — only active at L1 ──────────────────────
+    if (!zoomed) { return; } // L0: pinch disabled
     const [p0, p1] = [..._ptrs.values()];
     const curDist = Math.hypot(p1.x-p0.x, p1.y-p0.y);
     const curMidX = (p0.x+p1.x)/2, curMidY = (p0.y+p1.y)/2;
     const ds = curDist / _prevDist;
-    const newScale = clamp(scale * ds, MIN_SCALE, MAX_SCALE);
+    const newScale = clamp(scale * ds, L1_MIN_SCALE, L1_MAX_SCALE);
     const aDs = newScale / scale;
     panX = curMidX + (panX - _prevMidX) * aDs;
     panY = curMidY + (panY - _prevMidY) * aDs;
     scale = newScale; applyTransform();
-    if (zoomed && !_snapPending && scale < 0.72) { _snapPending = true; zoomOut(); }
+    // Pinch-out past threshold → snap back to L0
+    if (!_snapPending && scale <= L1_MIN_SCALE) { _snapPending = true; zoomOut(); }
     _prevDist = curDist; _prevMidX = curMidX; _prevMidY = curMidY;
+
   } else if (!_pinchActive && _ptrs.size === 1) {
+    // ── Single-finger pan — only at L1 ──────────────────────
+    if (!zoomed) return; // L0: pan disabled
     if (!(e.buttons & 1)) return;
     const dx = e.clientX - _lastX, dy = e.clientY - _lastY;
     _lastX = e.clientX; _lastY = e.clientY;
     if (!_didPan && Math.hypot(e.clientX-_startX, e.clientY-_startY) > PAN_THRESH)
       _didPan = true;
-    if (_didPan) { panX += dx; panY += dy; applyTransform(); }
+    if (_didPan) {
+      // Soft bounds: ±50% of screen
+      panX = clamp(panX + dx, -W*0.5, W*0.5);
+      panY = clamp(panY + dy, -H*0.5, H*0.5);
+      applyTransform();
+    }
   }
 });
+
+// Double-tap detection for L1→L0 on background tap
+let _lastTapTime = 0, _lastTapEl = null;
 
 function _handleTap(target) {
   if (panelOpen()) { closePanel(); return; }
@@ -663,17 +760,35 @@ function _handleTap(target) {
   if (catId && idx !== null && idx !== undefined) {
     const cat = CATS.find(c=>c.id===catId);
     openPanel(cat.techs[+idx], cat);
+    _lastTapTime = 0;
   } else if (catId) {
     zoomIn(catId);
+    _lastTapTime = 0;
   } else if (zoomed) {
-    zoomOut();
+    // Background tap: require double-tap to zoom out (prevents accidental exits)
+    const now = Date.now();
+    if (now - _lastTapTime < 350) {
+      zoomOut();
+      _lastTapTime = 0;
+    } else {
+      _lastTapTime = now;
+      _lastTapEl = target;
+    }
   }
 }
 
 svg.addEventListener('pointerup', e=>{
   _ptrs.delete(e.pointerId);
   if (_ptrs.size < 2 && _pinchActive) {
-    _pinchActive = false; _snapPending = false;
+    _pinchActive = false;
+    if (!_snapPending && zoomed && (scale < 0.95 || scale > 1.05)) {
+      // Snap back to L1 canonical (scale=1, pan=0) after pinch release
+      runAnim(300, ()=>{
+        const _fpx=panX,_fpy=panY,_fs=scale;
+        return [{from:0,to:1,set:t=>{panX=lerp(_fpx,0,t);panY=lerp(_fpy,0,t);scale=lerp(_fs,1,t);applyTransform();}}];
+      });
+    }
+    _snapPending = false;
     if (_ptrs.size === 1) {
       const [p] = [..._ptrs.values()];
       _lastX = p.x; _lastY = p.y; _didPan = true;
@@ -687,7 +802,7 @@ svg.addEventListener('pointerup', e=>{
 
 svg.addEventListener('pointercancel', e=>{
   _ptrs.delete(e.pointerId);
-  if (_ptrs.size < 2) _pinchActive = false;
+  if (_ptrs.size < 2) { _pinchActive = false; _snapPending = false; }
 });
 
 document.getElementById('back').addEventListener('click', e=>{
@@ -695,7 +810,7 @@ document.getElementById('back').addEventListener('click', e=>{
 });
 
 // ═══════════════════════════════════════════════════════════════
-// NAV
+// NAV + TINT
 // ═══════════════════════════════════════════════════════════════
 function updateNav(catId) {
   const btn = document.getElementById('back');
@@ -705,8 +820,23 @@ function updateNav(catId) {
   } else {
     btn.style.display='flex';
     const cat = CATS.find(c=>c.id===catId);
-    lbl.textContent = cat ? `${cat.emoji}  ${cat.name}` : '';
+    // Breadcrumb: "All Categories › Category Name"
+    lbl.textContent = cat ? `All Categories  ›  ${cat.emoji} ${cat.name}` : '';
     lbl.style.opacity='1';
+  }
+}
+
+function updateTint(catId) {
+  const tint = document.getElementById('tint');
+  if (!catId) {
+    tint.style.opacity = '0';
+    tint.style.background = 'transparent';
+  } else {
+    const cat = CATS.find(c=>c.id===catId);
+    if (cat) {
+      tint.style.background = cat.color;
+      tint.style.opacity = '0.035';
+    }
   }
 }
 

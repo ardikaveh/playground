@@ -45,7 +45,8 @@
     #navlabel { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.75); opacity: 0; transition: opacity 0.3s; }
 
     /* ── Main SVG ─────────────────────────────────────────── */
-    #viz { display: block; width: 100%; height: 100%; }
+    #viz { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    #viz:active { cursor: grabbing; }
 
     /* ── Legend ──────────────────────────────────────────── */
     #legend {
@@ -383,8 +384,11 @@ CATS.forEach(cat=>{
   el('feMergeNode',{in:'b'},m); el('feMergeNode',{in:'SourceGraphic'},m);
 });
 
+// ── Pannable wrapper (all content moves with pan) ────────────
+const gWrapper = el('g',{id:'gWrapper'},svg);
+
 // ── Stars ────────────────────────────────────────────────────
-const gStars = el('g',{},svg);
+const gStars = el('g',{},gWrapper);
 for(let i=0;i<200;i++){
   el('circle',{
     cx: Math.random()*W, cy: Math.random()*H,
@@ -394,11 +398,11 @@ for(let i=0;i<200;i++){
 }
 
 // ── Category group (rings + fill) ───────────────────────────
-const gCats = el('g',{id:'gCats'},svg);
+const gCats = el('g',{id:'gCats'},gWrapper);
 // ── Tech bubbles ─────────────────────────────────────────────
-const gTechs = el('g',{id:'gTechs'},svg);
+const gTechs = el('g',{id:'gTechs'},gWrapper);
 // ── Labels (on top) ─────────────────────────────────────────
-const gLabels = el('g',{id:'gLabels','pointer-events':'none'},svg);
+const gLabels = el('g',{id:'gLabels','pointer-events':'none'},gWrapper);
 
 // Build all elements
 CATS.forEach(cat=>{
@@ -482,6 +486,7 @@ let zoomed = null; // null = overview, else catId
 function zoomIn(catId) {
   if (zoomed === catId) return;
   zoomed = catId;
+  resetPan();
   updateNav(catId);
 
   runAnim(680, () => {
@@ -528,6 +533,7 @@ function zoomIn(catId) {
 
 function zoomOut() {
   zoomed = null;
+  resetPan();
   updateNav(null);
 
   runAnim(680, () => {
@@ -562,29 +568,51 @@ function zoomOut() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CLICK HANDLERS
+// PAN + TAP HANDLING
 // ═══════════════════════════════════════════════════════════════
-gCats.addEventListener('pointerup', e=>{
-  const catId = e.target.getAttribute('data-cat');
-  if (!catId) return;
-  e.stopPropagation();
-  if (panelOpen()) { closePanel(); return; }
-  zoomIn(catId);
-});
+let panX = 0, panY = 0;
+let _startX = 0, _startY = 0, _lastX = 0, _lastY = 0, _didPan = false;
+const PAN_THRESH = 6; // px of movement before treating as pan
 
-gTechs.addEventListener('pointerup', e=>{
-  const catId  = e.target.getAttribute('data-cat');
-  const idx    = e.target.getAttribute('data-idx');
-  if (!catId || idx == null) return;
-  e.stopPropagation();
-  const cat  = CATS.find(c=>c.id===catId);
-  const tech = cat.techs[+idx];
-  openPanel(tech, cat);
+function applyPan() {
+  gWrapper.setAttribute('transform', `translate(${panX},${panY})`);
+}
+function resetPan() {
+  panX = 0; panY = 0; applyPan();
+}
+
+svg.addEventListener('pointerdown', e=>{
+  _startX = _lastX = e.clientX;
+  _startY = _lastY = e.clientY;
+  _didPan = false;
+  svg.setPointerCapture(e.pointerId);
+}, {passive: true});
+
+svg.addEventListener('pointermove', e=>{
+  if (!(e.buttons & 1)) return;
+  const dx = e.clientX - _lastX, dy = e.clientY - _lastY;
+  _lastX = e.clientX; _lastY = e.clientY;
+  if (!_didPan && Math.hypot(e.clientX - _startX, e.clientY - _startY) > PAN_THRESH)
+    _didPan = true;
+  if (_didPan) { panX += dx; panY += dy; applyPan(); }
 });
 
 svg.addEventListener('pointerup', e=>{
-  if (e.target === svg || e.target === gStars) {
-    if (panelOpen()) { closePanel(); return; }
+  if (_didPan) { _didPan = false; return; }
+  // ── it's a tap ──
+  const t = e.target;
+  if (panelOpen()) { closePanel(); return; }
+
+  const catId = t.getAttribute('data-cat');
+  const idx   = t.getAttribute('data-idx');
+
+  if (catId && idx !== null && idx !== undefined) {
+    const cat  = CATS.find(c=>c.id===catId);
+    const tech = cat.techs[+idx];
+    openPanel(tech, cat);
+  } else if (catId) {
+    zoomIn(catId);
+  } else {
     if (zoomed) zoomOut();
   }
 });
